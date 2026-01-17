@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E01-T03, M1-E02-T01 |
+| **Next candidates** | M1-E02-T01 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T10:00:00Z"
+updated_at: "2026-01-17T11:00:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -43,7 +43,7 @@ roadmap:
 
 # Current focus for session continuity
 focus:
-  current_task: null
+  current_task: "M1-E01-T03"
   current_subtask: null
   last_update_by: "claude-code"
 
@@ -88,6 +88,25 @@ items:
         - "S01: src/main.rs exists with clap setup, cargo run -- --help shows usage"
         - "S02: src/lib.rs exists for library exports, cargo build succeeds"
         - "S03: Module directories created (cli/, core/, commands/, utils/) with mod.rs files"
+  "M1-E01-T03":
+    title: "Setup Test Infrastructure"
+    status: "done"
+    started_at: "2026-01-17T11:00:00Z"
+    done_at: "2026-01-17T11:15:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-17T11:15:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: tests/ directory created for integration tests"
+        - "S02: tests/common/mod.rs created with test helpers, compiles successfully"
+        - "S03: Helper functions setup_temp_skill_dir() and create_skill_dir() created, unit tests pass"
+        - "S04: Helper functions create_skill_md(), create_minimal_skill_md(), create_complete_skill_md() created, tests pass"
+        - "S05: cargo test runs successfully, 9 tests passed (5 unit tests in common/mod.rs + 4 integration tests)"
 
 # Session log (append-only)
 sessions:
@@ -105,6 +124,13 @@ sessions:
       - id: "M1-E01-T02"
         outcome: "done"
     notes: "Created project structure: main.rs with clap, lib.rs, and module directories (cli, core, commands, utils)."
+  - started_at: "2026-01-17T11:00:00Z"
+    ended_at: "2026-01-17T11:15:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E01-T03"
+        outcome: "done"
+    notes: "Created test infrastructure: tests/ directory, tests/common/mod.rs with helpers (setup_temp_skill_dir, create_skill_dir, create_skill_md, create_minimal_skill_md, create_complete_skill_md). All 9 tests pass."
 ```
 
 ---
