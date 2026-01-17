@@ -3,13 +3,13 @@
 ## Source of Truth
 
 You MUST use these documents as the authoritative plan:
-- PRD.md - Product requirements, functional specs, user workflows
-- TRD.md - Technical specs, domain model, security contracts
-- implementation_roadmap.md - Epic/task breakdown
-- use_cases.md - Acceptance criteria
-- traceability_matrix.md - Requirements coverage
+- [PRD.md](specs/PRD.md) - Product requirements, functional specs, user workflows
+- [TRD.md](specs/TRD.md) - Technical specs, domain model, security contracts
+- [implementation_roadmap.md](specs/implementation_roadmap) - Epic/task breakdown
+- [use_cases.md](specs/use_cases.md) - Acceptance criteria
+- [traceability_matrix.md](specs/traceability_matrix.md) - Requirements coverage
 
-The `research_archive/` directory is background context only. DO NOT use it as execution requirements.
+The `specs/research_archive/` directory is background context only. DO NOT use it as execution requirements.
 
 ## Project Context
 
@@ -31,26 +31,16 @@ You MUST gather context before writing code:
 ALWAYS follow these constraints:
 
 **Architecture**
-- NEVER import from a higher layer (e.g., `core/` must not import from `commands/`)
-- Use `thiserror` in `core/`, `anyhow` in `commands/`
-
-**Error Handling**
-- Define errors with `#[derive(Debug, thiserror::Error)]` in `core/errors.rs`
-- Wrap with `.context("message")` in command handlers
-
-**Serde**
-- Enums: `#[serde(rename_all = "kebab-case")]`
-- Optional fields: `#[serde(skip_serializing_if = "Option::is_none")]`
-- Config: `#[serde(deny_unknown_fields)]`
-
-**Filesystem**
-- Use `fs-err` over `std::fs` for better errors
-- Use `tempfile::tempdir_in(parent)` for same-filesystem atomicity
+- Dependencies flow downward only: `cli/` → `commands/` → `core/` → `utils/`
+- `thiserror` in `core/`, `anyhow` in `commands/`
+- `fs-err` over `std::fs`
 
 **File Locations**
 - Commands: `src/commands/<cmd>.rs`
 - Domain types: `src/core/{skill,agent}.rs`
 - Utilities: `src/utils/{paths,symlink,atomic,git}.rs`
+
+Read [docs/coding-practices.md](docs/coding-practices.md) for detailed patterns.
 
 ## Completing the Job
 

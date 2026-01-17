@@ -725,9 +725,9 @@ Week 8: Polish (M5)
 | [use_cases.md](use_cases.md) | Detailed use cases with acceptance criteria |
 | [implementation_roadmap.md](implementation_roadmap.md) | Epic/task/subtask breakdown |
 | [traceability_matrix.md](traceability_matrix.md) | Requirements to implementation mapping |
-| [agent_skills_research.md](agent_skills_research.md) | Background research on agent skills |
-| [agent_skills_comparison_matrix.md](agent_skills_comparison_matrix.md) | Agent-by-agent comparison |
-| [agent_skills_technical_spec.md](agent_skills_technical_spec.md) | Technical specification |
+| [agent_skills_research.md](research_archive/agent_skills_research.md) | Background research on agent skills |
+| [agent_skills_comparison_matrix.md](research_archive/agent_skills_comparison_matrix.md) | Agent-by-agent comparison |
+| [agent_skills_technical_spec.md](research_archive/agent_skills_technical_spec.md) | Technical specification |
 
 ### Supported Agents
 
