@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T13:05:00Z"
+updated_at: "2026-01-17T13:15:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -140,11 +140,11 @@ items:
         - "cargo fmt --check"
       subtasks: ["S01", "S02", "S03", "S04", "S05"]
       evidence:
-        - "S01: Agent enum already defined in src/core/skill.rs (from M1-E02-T01)"
-        - "S02: Scope enum already defined in src/core/skill.rs (from M1-E02-T01)"
-        - "S03: Installation struct already defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S01: Agent enum defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S02: Scope enum defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S03: Installation struct completed with is_symlink and symlink_target fields (base from M1-E02-T01, fields added in M1-E02-T02)"
         - "S04: Display trait implemented for Agent (agent.to_string() returns cli_name)"
-        - "S05: 13 unit tests passing (12 from M1-E02-T01 + new test_agent_display)"
+        - "S05: 14 unit tests passing (12 from M1-E02-T01 + test_agent_display + test_installation_with_symlink, test_installation_new updated)"
 
 # Session log (append-only)
 sessions:
@@ -177,12 +177,12 @@ sessions:
         outcome: "done"
     notes: "Created src/core/skill.rs with SkillMetadata, Skill, Installation, Agent, and Scope types. All structs implement Serialize/Deserialize. 12 unit tests passing."
   - started_at: "2026-01-17T13:00:00Z"
-    ended_at: "2026-01-17T13:05:00Z"
+    ended_at: "2026-01-17T13:15:00Z"
     by: "claude-code"
     worked_on:
       - id: "M1-E02-T02"
         outcome: "done"
-    notes: "Implemented Display trait for Agent enum (uses cli_name for output). Added test_agent_display unit test. 13 tests passing."
+    notes: "Implemented Display trait for Agent enum (uses cli_name for output). Completed Installation struct with is_symlink and symlink_target fields per roadmap spec. Added test_agent_display and test_installation_with_symlink unit tests. 14 tests passing."
 ```
 
 ---
