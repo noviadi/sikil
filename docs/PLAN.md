@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E02-T01 |
+| **Next candidates** | M1-E02-T02 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T11:00:00Z"
+updated_at: "2026-01-17T12:15:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -43,7 +43,7 @@ roadmap:
 
 # Current focus for session continuity
 focus:
-  current_task: "M1-E01-T03"
+  current_task: null
   current_subtask: null
   last_update_by: "claude-code"
 
@@ -107,6 +107,25 @@ items:
         - "S03: Helper functions setup_temp_skill_dir() and create_skill_dir() created, unit tests pass"
         - "S04: Helper functions create_skill_md(), create_minimal_skill_md(), create_complete_skill_md() created, tests pass"
         - "S05: cargo test runs successfully, 9 tests passed (5 unit tests in common/mod.rs + 4 integration tests)"
+  "M1-E02-T01":
+    title: "Define Skill Model"
+    status: "done"
+    started_at: "2026-01-17T12:00:00Z"
+    done_at: "2026-01-17T12:15:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-17T12:15:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: src/core/skill.rs created with skill model types"
+        - "S02: SkillMetadata struct defined with name, description, version, author, license fields"
+        - "S03: Skill struct defined with metadata, directory_name, installations, is_managed, repo_path fields"
+        - "S04: Serialize/Deserialize traits implemented for all structs (SkillMetadata, Skill, Installation, Agent, Scope)"
+        - "S05: 12 unit tests written and passing (test_skill_metadata_new, test_skill_metadata_builder, test_skill_new, test_skill_with_installation, test_skill_with_repo, test_skill_is_orphan, test_agent_cli_name, test_agent_from_cli_name, test_agent_all, test_installation_new, test_scope_equality, test_serialization)"
 
 # Session log (append-only)
 sessions:
@@ -131,6 +150,13 @@ sessions:
       - id: "M1-E01-T03"
         outcome: "done"
     notes: "Created test infrastructure: tests/ directory, tests/common/mod.rs with helpers (setup_temp_skill_dir, create_skill_dir, create_skill_md, create_minimal_skill_md, create_complete_skill_md). All 9 tests pass."
+  - started_at: "2026-01-17T12:00:00Z"
+    ended_at: "2026-01-17T12:15:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E02-T01"
+        outcome: "done"
+    notes: "Created src/core/skill.rs with SkillMetadata, Skill, Installation, Agent, and Scope types. All structs implement Serialize/Deserialize. 12 unit tests passing."
 ```
 
 ---
