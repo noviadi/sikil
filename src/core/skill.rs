@@ -4,6 +4,7 @@
 //! Agent Skills, including metadata and installation information.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::PathBuf;
 
 /// Metadata parsed from a SKILL.md file's YAML frontmatter
@@ -121,12 +122,38 @@ pub struct Installation {
 
     /// Global or workspace scope
     pub scope: Scope,
+
+    /// Whether this installation is a symlink
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_symlink: Option<bool>,
+
+    /// If is_symlink, the target path of the symlink
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symlink_target: Option<PathBuf>,
 }
 
 impl Installation {
     /// Creates a new Installation.
     pub fn new(agent: Agent, path: PathBuf, scope: Scope) -> Self {
-        Self { agent, path, scope }
+        Self {
+            agent,
+            path,
+            scope,
+            is_symlink: None,
+            symlink_target: None,
+        }
+    }
+
+    /// Sets whether this installation is a symlink.
+    pub fn with_is_symlink(mut self, is_symlink: bool) -> Self {
+        self.is_symlink = Some(is_symlink);
+        self
+    }
+
+    /// Sets the symlink target path.
+    pub fn with_symlink_target(mut self, target: PathBuf) -> Self {
+        self.symlink_target = Some(target);
+        self
     }
 }
 
@@ -179,6 +206,12 @@ impl Agent {
             "amp" => Some(Agent::Amp),
             _ => None,
         }
+    }
+}
+
+impl fmt::Display for Agent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.cli_name())
     }
 }
 
@@ -315,6 +348,25 @@ mod tests {
             PathBuf::from("/home/user/.claude/skills/test-skill")
         );
         assert_eq!(installation.scope, Scope::Global);
+        assert!(installation.is_symlink.is_none());
+        assert!(installation.symlink_target.is_none());
+    }
+
+    #[test]
+    fn test_installation_with_symlink() {
+        let installation = Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/home/user/.claude/skills/test-skill"),
+            Scope::Global,
+        )
+        .with_is_symlink(true)
+        .with_symlink_target(PathBuf::from("/home/user/.sikil/repo/test-skill"));
+
+        assert_eq!(installation.is_symlink, Some(true));
+        assert_eq!(
+            installation.symlink_target,
+            Some(PathBuf::from("/home/user/.sikil/repo/test-skill"))
+        );
     }
 
     #[test]
@@ -336,5 +388,14 @@ mod tests {
         let deserialized: SkillMetadata = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.name, "test-skill");
         assert_eq!(deserialized.version, Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_agent_display() {
+        assert_eq!(Agent::ClaudeCode.to_string(), "claude-code");
+        assert_eq!(Agent::Windsurf.to_string(), "windsurf");
+        assert_eq!(Agent::OpenCode.to_string(), "opencode");
+        assert_eq!(Agent::KiloCode.to_string(), "kilo-code");
+        assert_eq!(Agent::Amp.to_string(), "amp");
     }
 }

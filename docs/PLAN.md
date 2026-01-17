@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E02-T02 |
+| **Next candidates** | M1-E02-T03 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T12:15:00Z"
+updated_at: "2026-01-17T13:05:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -126,6 +126,25 @@ items:
         - "S03: Skill struct defined with metadata, directory_name, installations, is_managed, repo_path fields"
         - "S04: Serialize/Deserialize traits implemented for all structs (SkillMetadata, Skill, Installation, Agent, Scope)"
         - "S05: 12 unit tests written and passing (test_skill_metadata_new, test_skill_metadata_builder, test_skill_new, test_skill_with_installation, test_skill_with_repo, test_skill_is_orphan, test_agent_cli_name, test_agent_from_cli_name, test_agent_all, test_installation_new, test_scope_equality, test_serialization)"
+  "M1-E02-T02":
+    title: "Define Installation Model"
+    status: "done"
+    started_at: "2026-01-17T13:00:00Z"
+    done_at: "2026-01-17T13:05:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-17T13:05:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: Agent enum already defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S02: Scope enum already defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S03: Installation struct already defined in src/core/skill.rs (from M1-E02-T01)"
+        - "S04: Display trait implemented for Agent (agent.to_string() returns cli_name)"
+        - "S05: 13 unit tests passing (12 from M1-E02-T01 + new test_agent_display)"
 
 # Session log (append-only)
 sessions:
@@ -157,6 +176,13 @@ sessions:
       - id: "M1-E02-T01"
         outcome: "done"
     notes: "Created src/core/skill.rs with SkillMetadata, Skill, Installation, Agent, and Scope types. All structs implement Serialize/Deserialize. 12 unit tests passing."
+  - started_at: "2026-01-17T13:00:00Z"
+    ended_at: "2026-01-17T13:05:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E02-T02"
+        outcome: "done"
+    notes: "Implemented Display trait for Agent enum (uses cli_name for output). Added test_agent_display unit test. 13 tests passing."
 ```
 
 ---
