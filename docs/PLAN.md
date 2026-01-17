@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E01-T02, M1-E01-T03 |
+| **Next candidates** | M1-E01-T03, M1-E02-T01 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T00:00:00Z"
+updated_at: "2026-01-17T10:00:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -72,6 +72,22 @@ items:
         - "S03: All 17 production deps added (clap, serde, rusqlite, sha2, etc.)"
         - "S04: All 3 dev deps added (assert_cmd, predicates, insta)"
         - "S05: .gitignore exists with /target"
+  "M1-E01-T02":
+    title: "Project Structure"
+    status: "done"
+    started_at: "2026-01-17T10:00:00Z"
+    done_at: "2026-01-17T10:00:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-17T10:00:00Z"
+      commands:
+        - "cargo build"
+        - "cargo run -- --help"
+      subtasks: ["S01", "S02", "S03"]
+      evidence:
+        - "S01: src/main.rs exists with clap setup, cargo run -- --help shows usage"
+        - "S02: src/lib.rs exists for library exports, cargo build succeeds"
+        - "S03: Module directories created (cli/, core/, commands/, utils/) with mod.rs files"
 
 # Session log (append-only)
 sessions:
@@ -82,6 +98,13 @@ sessions:
       - id: "M1-E01-T01"
         outcome: "done"
     notes: "Completed project init with all deps. Fixed missing tempfile, once_cell, regex, sha2."
+  - started_at: "2026-01-17T10:00:00Z"
+    ended_at: "2026-01-17T10:15:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E01-T02"
+        outcome: "done"
+    notes: "Created project structure: main.rs with clap, lib.rs, and module directories (cli, core, commands, utils)."
 ```
 
 ---
