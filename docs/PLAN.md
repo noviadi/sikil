@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E01-T01, M1-E01-T02, M1-E01-T03 |
+| **Next candidates** | M1-E01-T02, M1-E01-T03 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | — |
+| **Recently completed** | M1-E01-T01 |
 
 ---
 
@@ -45,40 +45,43 @@ roadmap:
 focus:
   current_task: null
   current_subtask: null
-  last_update_by: null
+  last_update_by: "claude-code"
 
 # Claims prevent concurrent work on same task
 claims: {}
-  # Example:
-  # "M1-E01-T01":
-  #   claimed_by: "amp-agent"
-  #   claimed_at: "2026-01-17T10:00:00Z"
 
 # Task status entries (only list non-todo items)
 # Status values: todo | in_progress | blocked | done
-items: {}
-  # Example:
-  # "M1-E01-T01":
-  #   title: "Initialize Rust Project"
-  #   status: "done"
-  #   started_at: "2026-01-17T10:00:00Z"
-  #   done_at: "2026-01-17T10:30:00Z"
-  #   verification:
-  #     status: "passed"
-  #     at: "2026-01-17T10:29:00Z"
-  #     commands: ["cargo test", "cargo clippy -- -D warnings"]
-  #     evidence: ["All checks passed"]
+items:
+  "M1-E01-T01":
+    title: "Initialize Rust Project"
+    status: "done"
+    started_at: "2026-01-17T09:10:00Z"
+    done_at: "2026-01-17T09:30:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-17T09:30:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: Cargo.toml exists at project root"
+        - "S02: Package metadata complete (name, version, authors, license, edition)"
+        - "S03: All 17 production deps added (clap, serde, rusqlite, sha2, etc.)"
+        - "S04: All 3 dev deps added (assert_cmd, predicates, insta)"
+        - "S05: .gitignore exists with /target"
 
 # Session log (append-only)
-sessions: []
-  # Example:
-  # - started_at: "2026-01-17T10:00:00Z"
-  #   ended_at: "2026-01-17T12:00:00Z"
-  #   by: "amp-agent"
-  #   worked_on:
-  #     - id: "M1-E01-T01"
-  #       outcome: "done"
-  #   notes: "Initialized project structure"
+sessions:
+  - started_at: "2026-01-17T09:10:00Z"
+    ended_at: "2026-01-17T09:30:00Z"
+    by: "amp-agent"
+    worked_on:
+      - id: "M1-E01-T01"
+        outcome: "done"
+    notes: "Completed project init with all deps. Fixed missing tempfile, once_cell, regex, sha2."
 ```
 
 ---
@@ -97,4 +100,5 @@ sessions: []
 A task marked `done` MUST have:
 - `verification.status: passed`
 - `verification.commands`: list of commands run
-- `verification.evidence`: brief description of outcome
+- `verification.subtasks`: list of subtask IDs verified (e.g., `["S01", "S02", "S03"]`)
+- `verification.evidence`: brief description confirming each subtask's "Verifiable By" criterion was met
