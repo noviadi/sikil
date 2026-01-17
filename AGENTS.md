@@ -47,6 +47,21 @@
 
 **A task is NOT done if any subtask's verification criterion is unmet.**
 
+### Completion Checklist (REQUIRED)
+
+Before ending your session, confirm ALL items:
+
+- [ ] All subtasks verified against "Verifiable By" column
+- [ ] `cargo test` passed
+- [ ] `cargo clippy -- -D warnings` passed  
+- [ ] `cargo fmt --check` passed
+- [ ] PLAN.md `items` updated with full verification block
+- [ ] PLAN.md `claims` entry removed
+- [ ] PLAN.md Quick View updated
+- [ ] **Git commit created** with `<TASK_ID>: <description>` format
+
+**DO NOT end session without completing ALL checklist items.**
+
 ### End of Session / Handoff
 - Update `focus.current_task` and `focus.current_subtask`
 - Update session entry with `ended_at`, `worked_on`, and `notes`
