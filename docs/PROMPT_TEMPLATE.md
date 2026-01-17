@@ -7,9 +7,14 @@ Use these prompts when starting a new task implementation session.
 ## Standard Prompt
 
 ```
-Implement the next eligible task from docs/PLAN.md.
+Implement the next eligible task.
 
-Follow the workflow in AGENTS.md exactly. Complete ALL items in the Completion Checklist before ending.
+Read these files first:
+1. AGENTS.md (project root) - workflow instructions
+2. docs/PLAN.md - current progress and next task
+3. specs/implementation_roadmap.md - task subtasks
+
+Complete ALL items in the Completion Checklist before ending.
 ```
 
 ---
@@ -19,13 +24,20 @@ Follow the workflow in AGENTS.md exactly. Complete ALL items in the Completion C
 ```
 Implement task <TASK_ID>.
 
-Follow the workflow in AGENTS.md exactly. Complete ALL items in the Completion Checklist before ending.
+Read these files first:
+1. AGENTS.md (project root) - workflow instructions
+2. docs/PLAN.md - current progress
+3. specs/implementation_roadmap.md - task subtasks
+
+Complete ALL items in the Completion Checklist before ending.
 ```
 
 ---
 
-## References
+## File Locations
 
-- Workflow & Checklist: `AGENTS.md`
-- Task Progress: `docs/PLAN.md`
-- Task Details: `specs/implementation_roadmap.md`
+| File | Path |
+|------|------|
+| Workflow & Checklist | `AGENTS.md` (project root, NOT in docs/) |
+| Task Progress | `docs/PLAN.md` |
+| Task Details | `specs/implementation_roadmap.md` |
