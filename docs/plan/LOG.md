@@ -171,3 +171,7 @@ Format:
 ### M2-E02-T03 — claude-opus-4-5 — done
 - **Completed**: 2026-01-18T21:29:21Z
 - **Notes**: Implemented table-based output format for the list command with proper column alignment, status indicators, and color coding for managed/unmanaged skills.
+
+### M2-E02-T04 — claude-opus-4-5 — done
+- **Completed**: 2026-01-18T21:33:53Z
+- **Notes**: Wired List command to CLI with proper clap argument parsing and error handling
