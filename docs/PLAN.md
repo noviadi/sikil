@@ -159,7 +159,7 @@ items:
         - "cargo fmt --check"
       subtasks: ["S01", "S02", "S03", "S04", "S05", "S06", "S07"]
       evidence:
-        - "S01: src/core/error.rs created with SikilError enum"
+        - "S01: src/core/errors.rs created with SikilError enum"
         - "S02: SikilError enum defined with #[derive(Error, Debug)] using thiserror"
         - "S03: Error variants added: InvalidSkillMd, SkillNotFound, DirectoryNotFound"
         - "S04: Error variants added: SymlinkError, GitError, ConfigError"
@@ -210,7 +210,7 @@ sessions:
     worked_on:
       - id: "M1-E02-T03"
         outcome: "done"
-    notes: "Created src/core/error.rs with SikilError enum using thiserror. Added all 13 error variants (InvalidSkillMd, SkillNotFound, DirectoryNotFound, SymlinkError, GitError, ConfigError, AlreadyExists, PermissionDenied, ValidationError, PathTraversal, SymlinkNotAllowed, InvalidGitUrl, ConfigTooLarge). 14 unit tests passing. 28 tests total in codebase."
+    notes: "Created src/core/errors.rs with SikilError enum using thiserror. Added all 13 error variants (InvalidSkillMd, SkillNotFound, DirectoryNotFound, SymlinkError, GitError, ConfigError, AlreadyExists, PermissionDenied, ValidationError, PathTraversal, SymlinkNotAllowed, InvalidGitUrl, ConfigTooLarge). 14 unit tests passing. 28 tests total in codebase. Note: Initially created as error.rs, renamed to errors.rs for roadmap compliance (S01)."
 ```
 
 ---
