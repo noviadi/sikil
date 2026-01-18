@@ -3,27 +3,32 @@
 ## Standard Prompt
 
 ```
-Implement the next eligible task.
+Implement the next eligible task (exactly ONE task this session).
 
-Read first:
-1. AGENTS.md - workflow
-2. docs/plan/STATE.yaml - current progress
-3. specs/implementation_roadmap.md - task subtasks
+Select the task by reading:
+- docs/plan/STATE.yaml (what's done / current focus)
+- specs/implementation_roadmap.md (eligibility + subtasks)
 
-Complete ALL items in the "Complete" checklist before ending.
+Rules:
+- Eligible = not done AND all [DEP: ...] are done; STOP if none eligible.
+- When finished: run ./scripts/verify.sh, then ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>".
+- If anything is unclear, follow AGENTS.md (already loaded in context).
 ```
 
 ## Task-Specific Prompt
 
 ```
-Implement task <TASK_ID>.
+Implement task <TASK_ID> (exactly ONE task this session).
 
-Read first:
-1. AGENTS.md - workflow
-2. docs/plan/STATE.yaml - current progress  
-3. specs/implementation_roadmap.md - task subtasks
+Read:
+- docs/plan/STATE.yaml (confirm status/focus)
+- specs/implementation_roadmap.md (subtasks + "Verifiable By")
 
-Complete ALL items in the "Complete" checklist before ending.
+Finish by running:
+- ./scripts/verify.sh
+- ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
+
+If workflow details are unclear, follow AGENTS.md (already loaded in context).
 ```
 
 ## Code Review Prompt
@@ -33,10 +38,9 @@ Review the latest completed task.
 
 Verify:
 1. All subtasks match "Verifiable By" in roadmap
-2. cargo test/clippy/fmt passed
+2. ./scripts/verify.sh passed (test + clippy + fmt)
 3. Git commit has verification block
-4. STATE.yaml updated
-5. LOG.md has entry
+4. STATE.yaml + LOG.md updated (via ./scripts/complete-task.sh)
 
 Report any issues.
 ```
@@ -49,4 +53,5 @@ Report any issues.
 | State | `docs/plan/STATE.yaml` |
 | Log | `docs/plan/LOG.md` |
 | Tasks | `specs/implementation_roadmap.md` |
-| Quick View | `docs/PLAN.md` |
+| Verify | `scripts/verify.sh` |
+| Complete | `scripts/complete-task.sh` |
