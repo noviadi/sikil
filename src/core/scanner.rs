@@ -66,6 +66,23 @@ pub enum InstallationType {
 /// }
 /// ```
 pub fn classify_installation(path: &Path) -> InstallationType {
+    classify_installation_with_repo_path(path, &get_repo_path())
+}
+
+/// Classifies a skill installation by its type using an explicit repo path.
+///
+/// This is a testable version of `classify_installation` that accepts the repo
+/// path as a parameter instead of reading from `~/.sikil/repo`.
+///
+/// # Arguments
+///
+/// * `path` - The path to the skill installation to classify
+/// * `repo_path` - The path to the managed skills repository
+///
+/// # Returns
+///
+/// An `InstallationType` indicating how the skill is installed
+pub fn classify_installation_with_repo_path(path: &Path, repo_path: &Path) -> InstallationType {
     use crate::utils::symlink::is_symlink;
 
     // Check if it's a symlink
@@ -74,8 +91,7 @@ pub fn classify_installation(path: &Path) -> InstallationType {
         match resolve_realpath(path) {
             Ok(real_target) => {
                 // Check if the target is under the repo path
-                let repo_path = get_repo_path();
-                if real_target.starts_with(&repo_path) {
+                if real_target.starts_with(repo_path) {
                     InstallationType::Managed
                 } else {
                     InstallationType::ForeignSymlink
@@ -223,6 +239,8 @@ pub struct Scanner {
     cache: Option<SqliteCache>,
     /// Whether to use the cache (can be disabled via --no-cache)
     use_cache: bool,
+    /// Optional workspace root override (for testing; uses env::current_dir() if None)
+    workspace_root: Option<PathBuf>,
 }
 
 impl Scanner {
@@ -232,6 +250,7 @@ impl Scanner {
             config,
             cache: SqliteCache::open().ok(),
             use_cache: true,
+            workspace_root: None,
         }
     }
 
@@ -246,6 +265,7 @@ impl Scanner {
             config,
             cache,
             use_cache,
+            workspace_root: None,
         }
     }
 
@@ -255,7 +275,31 @@ impl Scanner {
             config,
             cache: None,
             use_cache: false,
+            workspace_root: None,
         }
+    }
+
+    /// Sets an explicit workspace root directory.
+    ///
+    /// When set, this path is used instead of `env::current_dir()` to resolve
+    /// relative workspace paths. This is primarily useful for testing.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The workspace root directory path
+    pub fn with_workspace_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.workspace_root = Some(root.into());
+        self
+    }
+
+    /// Returns the effective workspace root directory.
+    ///
+    /// If an explicit workspace root was set via `with_workspace_root()`,
+    /// returns that path. Otherwise, returns `env::current_dir()`.
+    fn get_workspace_root(&self) -> PathBuf {
+        self.workspace_root
+            .clone()
+            .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
     }
 
     /// Calculates the total size of a directory in bytes.
@@ -639,13 +683,12 @@ impl Scanner {
                     }
                 }
 
-                // Scan workspace path (relative to CWD)
+                // Scan workspace path (relative to workspace root)
                 let workspace_path = if agent_config.workspace_path.is_absolute() {
                     agent_config.workspace_path.clone()
                 } else {
-                    // Relative to current working directory
-                    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                    cwd.join(&agent_config.workspace_path)
+                    // Relative to workspace root (uses env::current_dir() by default)
+                    self.get_workspace_root().join(&agent_config.workspace_path)
                 };
 
                 if workspace_path.exists() {
@@ -1355,15 +1398,9 @@ description: A test skill
             ),
         );
 
-        // Change to workspace temp directory for workspace scan
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_workspace.path()).unwrap();
-
-        let scanner = Scanner::new(config);
+        // Use with_workspace_root instead of changing global current directory
+        let scanner = Scanner::new(config).with_workspace_root(temp_workspace.path());
         let result = scanner.scan_all_agents();
-
-        // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result.skill_count(), 1);
         assert!(result.skills.contains_key("test-skill"));
@@ -1639,10 +1676,6 @@ description: A workspace-local skill
         )
         .unwrap();
 
-        // Change to temp directory
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(&temp_path).unwrap();
-
         // Create config with relative workspace path
         let mut config = Config::new();
         config.insert_agent(
@@ -1654,11 +1687,9 @@ description: A workspace-local skill
             ),
         );
 
-        let scanner = Scanner::new(config);
+        // Use with_workspace_root instead of changing global current directory
+        let scanner = Scanner::new(config).with_workspace_root(&temp_path);
         let result = scanner.scan_all_agents();
-
-        // Restore original directory before temp_base is dropped
-        env::set_current_dir(original_dir).unwrap();
 
         // Should find the workspace skill
         assert_eq!(result.skill_count(), 1);
@@ -1667,8 +1698,6 @@ description: A workspace-local skill
         // Verify it's a workspace installation
         let skill = &result.skills["workspace-skill"];
         assert_eq!(skill.installations[0].scope, Scope::Workspace);
-
-        // temp_base will be cleaned up when it goes out of scope
     }
 
     #[test]
@@ -1699,19 +1728,9 @@ description: A workspace-local skill
         let link = temp_dir.path().join("skill-link");
         std::os::unix::fs::symlink(&skill, &link).unwrap();
 
-        // Temporarily set HOME to temp dir for this test
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", temp_dir.path());
-
-        let result = classify_installation(&link);
+        // Use classify_installation_with_repo_path instead of modifying HOME env var
+        let result = classify_installation_with_repo_path(&link, &repo);
         assert_eq!(result, InstallationType::Managed);
-
-        // Restore original HOME
-        if let Some(home) = original_home {
-            env::set_var("HOME", home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
