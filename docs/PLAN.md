@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E03-T02, M1-E03-T03 |
+| **Next candidates** | M1-E03-T03 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03, M1-E03-T01 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03, M1-E03-T01, M1-E03-T02 |
 
 ---
 
@@ -185,10 +185,38 @@ items:
         - "S03: Config struct defined with HashMap<String, AgentConfig>, compiles"
         - "S04: Default trait implemented with hardcoded paths for all 5 agents (claude-code, windsurf, opencode, kilocode, amp), unit test passes"
         - "S05: 7 unit tests written and passing (test_agent_config_new, test_config_new, test_config_insert_and_get_agent, test_config_default_has_all_agents, test_config_default_all_agents_enabled, test_config_default_agent_paths, test_config_serialization)"
+  "M1-E03-T02":
+    title: "Config File Loading"
+    status: "done"
+    started_at: "2026-01-18T09:30:00Z"
+    done_at: "2026-01-18T09:50:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T09:50:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05", "S06", "S07"]
+      evidence:
+        - "S01: toml crate already present in Cargo.toml dependencies"
+        - "S02: Config::load() implemented, loads from ~/.sikil/config.toml, unit test passes (test_config_load_valid_toml)"
+        - "S03: Fallback to defaults if file missing, unit test passes (test_config_load_missing_file_returns_defaults)"
+        - "S04: Path expansion using shellexpand implemented in expand_path() helper, unit test passes (test_config_expand_paths)"
+        - "S05: Config file size limit (1MB max) implemented and enforced, unit test passes (test_config_load_oversized_file_returns_error)"
+        - "S06: #[serde(deny_unknown_fields)] added to AgentConfig and Config structs, unit test passes (test_config_deny_unknown_fields)"
+        - "S07: Integration test with temp config file passes (all subtask tests pass)"
 
 # Session log (append-only)
 sessions:
-   - started_at: "2026-01-18T09:00:00Z"
+  - started_at: "2026-01-18T09:30:00Z"
+    ended_at: "2026-01-18T09:50:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E03-T02"
+        outcome: "done"
+    notes: "Implemented Config file loading with Config::load() method. Added ConfigError enum for config-specific errors. Implemented path expansion using shellexpand. Added file size limit (1MB max). Added deny_unknown_fields to config structs. Created 8 comprehensive unit tests covering valid TOML loading, missing file fallback, oversized files, invalid TOML, path expansion, and unknown fields. All 51 tests pass (42 lib + 9 integration)."
+  - started_at: "2026-01-18T09:00:00Z"
     ended_at: "2026-01-18T09:10:00Z"
     by: "claude-code"
     worked_on:

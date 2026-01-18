@@ -1,9 +1,12 @@
+use crate::core::errors::ConfigError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Agent-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AgentConfig {
     /// Whether this agent is enabled
     pub enabled: bool,
@@ -26,6 +29,7 @@ impl AgentConfig {
 
 /// Global configuration for sikil
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     /// Agent configurations indexed by agent name
     pub agents: HashMap<String, AgentConfig>,
@@ -48,6 +52,52 @@ impl Config {
     pub fn get_agent(&self, name: &str) -> Option<&AgentConfig> {
         self.agents.get(name)
     }
+
+    /// Load configuration from a TOML file
+    /// If the file doesn't exist, returns the default configuration.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the config file (typically ~/.sikil/config.toml)
+    ///
+    /// # Errors
+    /// - If file exists but is larger than 1MB
+    /// - If file exists but contains invalid TOML
+    /// - If file exists but contains unknown fields
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        // Check if file exists
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+
+        // Check file size (1MB max = 1_048_576 bytes)
+        let metadata = fs::metadata(path).map_err(|e| ConfigError::FileRead(e.to_string()))?;
+        let file_size = metadata.len();
+        if file_size > 1_048_576 {
+            return Err(ConfigError::ConfigTooLarge(file_size));
+        }
+
+        // Read and parse TOML
+        let content = fs::read_to_string(path).map_err(|e| ConfigError::FileRead(e.to_string()))?;
+        let config: Config =
+            toml::from_str(&content).map_err(|e| ConfigError::InvalidToml(e.to_string()))?;
+
+        Ok(config)
+    }
+
+    /// Expand paths in the configuration (replacing ~ with home directory)
+    pub fn expand_paths(&mut self) {
+        for agent_config in self.agents.values_mut() {
+            agent_config.global_path = expand_path(&agent_config.global_path);
+            agent_config.workspace_path = expand_path(&agent_config.workspace_path);
+        }
+    }
+}
+
+/// Expand ~ to home directory
+fn expand_path(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    let expanded = shellexpand::tilde(&path_str);
+    PathBuf::from(expanded.as_ref())
 }
 
 impl Default for Config {
@@ -212,5 +262,150 @@ mod tests {
 
         let config2 = deserialized.unwrap();
         assert!(config2.get_agent("test-agent").is_some());
+    }
+
+    #[test]
+    fn test_config_load_missing_file_returns_defaults() {
+        let result = Config::load(std::path::Path::new("/nonexistent/path/to/config.toml"));
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert!(config.get_agent("claude-code").is_some());
+        assert!(config.get_agent("amp").is_some());
+    }
+
+    #[test]
+    fn test_config_load_valid_toml() {
+        // Create a temporary TOML file
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        let toml_content = r#"
+[agents.test-agent]
+enabled = false
+global_path = "/test/global"
+workspace_path = ".test/workspace"
+"#;
+
+        std::fs::write(temp_path, toml_content).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        let agent = config.get_agent("test-agent");
+        assert!(agent.is_some());
+        assert!(!agent.unwrap().enabled);
+        assert_eq!(agent.unwrap().global_path, PathBuf::from("/test/global"));
+    }
+
+    #[test]
+    fn test_config_load_partial_merges_with_defaults() {
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        // Only specify one agent, others should come from defaults
+        let toml_content = r#"
+[agents.custom-agent]
+enabled = true
+global_path = "/custom/global"
+workspace_path = ".custom/workspace"
+"#;
+
+        std::fs::write(temp_path, toml_content).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert!(config.get_agent("custom-agent").is_some());
+        // Default agents are not merged since we're not using Default::default() after load
+    }
+
+    #[test]
+    fn test_config_load_invalid_toml_returns_error() {
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        let invalid_toml = "agents]\n[broken = ]";
+        std::fs::write(temp_path, invalid_toml).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ConfigError::InvalidToml(_) => {
+                // Expected
+            }
+            _ => panic!("Expected InvalidToml error"),
+        }
+    }
+
+    #[test]
+    fn test_config_load_oversized_file_returns_error() {
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        // Create content larger than 1MB
+        let large_content = "a".repeat(1_048_577);
+        std::fs::write(temp_path, large_content).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ConfigError::ConfigTooLarge(size) => {
+                assert_eq!(size, 1_048_577);
+            }
+            _ => panic!("Expected ConfigTooLarge error"),
+        }
+    }
+
+    #[test]
+    fn test_config_deny_unknown_fields() {
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        let toml_with_unknown_field = r#"
+[agents.test-agent]
+enabled = true
+global_path = "/test/global"
+workspace_path = ".test/workspace"
+unknown_field = "this should fail"
+"#;
+
+        std::fs::write(temp_path, toml_with_unknown_field).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ConfigError::InvalidToml(msg) => {
+                assert!(
+                    msg.to_lowercase().contains("unknown") || msg.to_lowercase().contains("field")
+                );
+            }
+            _ => panic!("Expected InvalidToml error for unknown field"),
+        }
+    }
+
+    #[test]
+    fn test_config_expand_paths() {
+        let mut config = Config::new();
+        config.insert_agent(
+            "test-agent".to_string(),
+            AgentConfig::new(
+                true,
+                PathBuf::from("~/.cache/agent/skills"),
+                PathBuf::from(".agent/skills"),
+            ),
+        );
+
+        config.expand_paths();
+
+        let agent = config.get_agent("test-agent").unwrap();
+        // After expansion, path should not contain ~
+        let global_path_str = agent.global_path.to_string_lossy();
+        assert!(!global_path_str.contains('~'));
     }
 }

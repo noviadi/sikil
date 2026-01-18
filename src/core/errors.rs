@@ -62,8 +62,24 @@ pub enum SikilError {
     InvalidGitUrl { url: String, reason: String },
 
     /// Configuration file exceeds maximum size
-    #[error("Configuration file too large: {size} bytes (maximum {max_size} bytes)")]
-    ConfigTooLarge { size: u64, max_size: u64 },
+    #[error("Configuration file too large: {size} bytes (maximum 1048576 bytes)")]
+    ConfigTooLarge { size: u64 },
+}
+
+/// Configuration-specific error type
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    /// File read error
+    #[error("Failed to read config file: {0}")]
+    FileRead(String),
+
+    /// Invalid TOML syntax
+    #[error("Invalid TOML in config: {0}")]
+    InvalidToml(String),
+
+    /// Configuration file exceeds maximum size
+    #[error("Configuration file too large: {0} bytes (maximum 1048576 bytes)")]
+    ConfigTooLarge(u64),
 }
 
 #[cfg(test)]
@@ -190,10 +206,7 @@ mod tests {
 
     #[test]
     fn test_error_display_config_too_large() {
-        let err = SikilError::ConfigTooLarge {
-            size: 2_500_000,
-            max_size: 1_048_576,
-        };
+        let err = SikilError::ConfigTooLarge { size: 2_500_000 };
         assert_eq!(
             err.to_string(),
             "Configuration file too large: 2500000 bytes (maximum 1048576 bytes)"
