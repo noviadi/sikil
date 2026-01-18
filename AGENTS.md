@@ -31,32 +31,28 @@
 2. Implement each subtask
 3. Verify against "Verifiable By" column
 
-### 3. Complete (ALL steps required)
+### 3. Complete (ONE command)
 
 ```
-□ Run: ./scripts/verify.sh
-□ Run: ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
-□ Git commit (include STATE.yaml, LOG.md in same commit)
+□ Run: ./scripts/finish-task.sh "<TASK_ID>" "<agent>" "<description>" \
+    --subtask "S01:<evidence>" --subtask "S02:<evidence>" ...
 ```
 
-**Scripts:**
-- `scripts/verify.sh` — Runs cargo test + clippy + fmt in one call
-- `scripts/complete-task.sh` — Atomically updates STATE.yaml + LOG.md
+This single command:
+1. Runs `verify.sh` (fails fast if tests/clippy/fmt fail)
+2. Updates STATE.yaml + LOG.md via `complete-task.sh`
+3. Creates properly formatted commit with verification results
 
-### Commit Message Format
+**Options:**
+- `--notes "<notes>"` — Custom notes for LOG.md (defaults to description)
+- `--force` — Skip focus mismatch check
+- `--no-verify` — Skip verification (use with caution)
 
-```
-<TASK_ID>: <description>
-
-Verification:
-- cargo test: <result>
-- cargo clippy -- -D warnings: <result>
-- cargo fmt --check: <result>
-
-Subtasks:
-- S01: <evidence>
-- S02: <evidence>
-...
+**Example:**
+```bash
+./scripts/finish-task.sh "M2-E01-T05" "amp" "implement cache integration" \
+  --subtask "S01:Added CacheService struct" \
+  --subtask "S02:Unit tests in cache_test.rs"
 ```
 
 ---
