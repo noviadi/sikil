@@ -47,6 +47,10 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub quiet: bool,
 
+    /// Disable cache for this command
+    #[arg(long, global = true)]
+    pub no_cache: bool,
+
     /// Subcommand to execute
     #[command(subcommand)]
     pub command: Commands,
