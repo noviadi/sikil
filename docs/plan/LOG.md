@@ -87,3 +87,8 @@ Format:
 - **Started**: 2026-01-18T21:30:00Z
 - **Ended**: 2026-01-18T22:00:00Z
 - **Notes**: Created src/utils/paths.rs with expand_path(), get_repo_path(), get_config_path(), and ensure_dir_exists(). Uses directories crate v5 API with UserDirs. All 8 unit tests passing (tilde expansion, env vars, relative/absolute paths, repo/config paths, directory creation).
+
+### M1-E05-T02 — claude-opus-4-5 — done
+- **Started**: 2026-01-18T22:15:00Z
+- **Ended**: 2026-01-18T23:00:00Z
+- **Notes**: Created src/utils/symlink.rs with symlink utilities: create_symlink(), is_symlink(), read_symlink_target(), resolve_realpath(), and is_managed_symlink(). All functions properly handle errors using SikilError. 17 comprehensive unit tests covering symlink creation, detection, reading, resolution, and managed/unmanaged classification. All 111 tests pass.
