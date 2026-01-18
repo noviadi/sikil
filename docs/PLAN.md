@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E04-T01 |
+| **Next candidates** | M1-E04-T02 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E03-T03, M1-E03-T02, M1-E03-T01, M1-E02-T03, M1-E02-T02, M1-E02-T01, M1-E01-T03, M1-E01-T02, M1-E01-T01 |
+| **Recently completed** | M1-E04-T01, M1-E03-T03, M1-E03-T02, M1-E03-T01, M1-E02-T03, M1-E02-T02, M1-E02-T01, M1-E01-T03, M1-E01-T02, M1-E01-T01 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-18T10:00:00Z"
+updated_at: "2026-01-18T11:00:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -235,9 +235,35 @@ items:
         - "S04: Test disabled agent is excluded - added test_config_disabled_agent_is_excluded and test_config_iter_enabled_agents_only"
         - "S05: Test config file over size limit returns error - already covered by test_config_load_oversized_file_returns_error"
         - "S06: Test unknown fields in config returns error - already covered by test_config_deny_unknown_fields"
+  "M1-E04-T01":
+    title: "Frontmatter Extraction"
+    status: "done"
+    started_at: "2026-01-18T11:00:00Z"
+    done_at: "2026-01-18T11:30:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T11:30:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: src/core/parser.rs created with extract_frontmatter() function"
+        - "S02: extract_frontmatter() correctly extracts YAML content between --- markers, returns &str"
+        - "S03: Missing frontmatter (no --- markers) returns InvalidSkillMd error with descriptive reason"
+        - "S04: Malformed frontmatter (single ---) returns InvalidSkillMd error with descriptive reason"
+        - "S05: 16 unit tests written and passing (test_extract_frontmatter_valid, test_extract_frontmatter_valid_with_leading_newline, test_extract_frontmatter_valid_multiline, test_extract_frontmatter_missing_markers, test_extract_frontmatter_single_marker, test_extract_frontmatter_not_at_start, test_extract_frontmatter_empty_frontmatter, test_extract_frontmatter_with_empty_lines_in_frontmatter, test_extract_frontmatter_preserves_internal_spacing, test_extract_frontmatter_empty_content, test_extract_frontmatter_only_whitespace, test_extract_frontmatter_three_markers, test_extract_frontmatter_marker_with_spaces, test_extract_frontmatter_complex_yaml, plus 1 doc test)"
 
 # Session log (append-only)
 sessions:
+  - started_at: "2026-01-18T11:00:00Z"
+    ended_at: "2026-01-18T11:30:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E04-T01"
+        outcome: "done"
+    notes: "Implemented Frontmatter Extraction for SKILL.md parser. Created src/core/parser.rs with extract_frontmatter() function that extracts YAML content between --- markers. Handles missing frontmatter (no --- markers) and malformed frontmatter (single ---) with descriptive InvalidSkillMd errors. Added 16 comprehensive unit tests covering valid/invalid/malformed/edge case scenarios. All 68 tests pass (58 lib tests + 9 integration tests + 1 doc test)."
   - started_at: "2026-01-18T09:55:00Z"
     ended_at: "2026-01-18T10:00:00Z"
     by: "claude-code"
