@@ -5,8 +5,8 @@ roadmap: "specs/implementation_roadmap.md"
 
 # Current focus (who's working on what)
 focus:
-  current_task: null
-  by: null
+  current_task: "M2-E01-T04"
+  by: "claude"
 
 # Task statuses (only non-todo items)
 # Evidence for all tasks: git log --grep="<TASK_ID>"
