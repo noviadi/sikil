@@ -1,0 +1,12 @@
+---
+source: tests/parser_integration_test.rs
+assertion_line: 244
+expression: json
+---
+{
+  "name": "complex-metadata",
+  "description": "A skill with a complex multi-line\ndescription that spans multiple\nlines in the YAML.\n",
+  "version": "2.3.4-beta",
+  "author": "Open Source Contributor <contributor@example.com>",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,9 @@
+---
+source: tests/parser_integration_test.rs
+assertion_line: 220
+expression: json
+---
+{
+  "name": "minimal-skill",
+  "description": "A minimal skill with only required fields"
+}

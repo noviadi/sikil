@@ -77,3 +77,8 @@ Format:
 - **Started**: 2026-01-18T13:30:00Z
 - **Ended**: 2026-01-18T14:00:00Z
 - **Notes**: Implemented validate_skill_name() with regex ^[a-z0-9][a-z0-9_-]{0,63}$. Added 21 comprehensive unit tests covering all validation rules (empty name, starts with hyphen/underscore, uppercase, dots, path separators, path traversal, max length). All 86 tests pass.
+
+### M1-E04-T04 — claude-code — done
+- **Started**: 2026-01-18T20:30:00Z
+- **Ended**: 2026-01-18T21:00:00Z
+- **Notes**: Created integration tests for parser with fixtures. 4 valid SKILL.md fixtures, 6 invalid fixtures. 10 integration tests for parsing valid/invalid skills. 3 snapshot tests for JSON output. All 111 tests pass.
