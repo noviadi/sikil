@@ -249,7 +249,7 @@ fn print_human_readable(output: &Output, skills: &[ListSkillOutput]) {
     let managed_count = skills.iter().filter(|s| s.managed).count();
     let unmanaged_count = skills.len() - managed_count;
 
-    // Print header
+    // Print header with summary
     output.print_info(&format!(
         "Found {} skill{} ({} managed, {} unmanaged)",
         skills.len(),
@@ -257,42 +257,96 @@ fn print_human_readable(output: &Output, skills: &[ListSkillOutput]) {
         managed_count,
         unmanaged_count
     ));
+
+    if skills.is_empty() {
+        return;
+    }
+
     output.print_info("");
 
-    for skill in skills {
-        // Print status indicator
-        if skill.managed {
-            output.print_success(&format!("{} ✓", skill.name));
-        } else {
-            output.print_warning(&format!("{} ?", skill.name));
-        };
+    // Calculate column widths
+    let max_name_len = skills
+        .iter()
+        .map(|s| s.name.len())
+        .max()
+        .unwrap_or(20)
+        .min(30);
+    let name_width = max_name_len.max(15);
+    let desc_width = 50;
 
-        // Print description (truncated if too long)
-        let desc = if skill.description.len() > 60 {
-            format!("{}...", &skill.description[..57])
+    // Print table header
+    let header = format!(
+        "{:<width_name$}  {:<width_desc$}  {}",
+        "NAME",
+        "DESCRIPTION",
+        "AGENTS",
+        width_name = name_width,
+        width_desc = desc_width
+    );
+    let separator = format!(
+        "{:-<width_name$}  {:-<width_desc$}  {:-<20}",
+        "",
+        "",
+        "",
+        width_name = name_width,
+        width_desc = desc_width
+    );
+
+    output.print_info(&header);
+    output.print_info(&separator);
+
+    // Print each skill as a table row
+    for skill in skills {
+        // Format skill name with status indicator
+        let status_char = if skill.managed { "✓" } else { "?" };
+
+        let name_with_status = format!("{} {}", status_char, skill.name);
+
+        // Truncate description if needed
+        let desc = if skill.description.len() > desc_width {
+            format!("{}...", &skill.description[..desc_width.saturating_sub(3)])
         } else {
             skill.description.clone()
         };
-        output.print_info(&format!("  {}", desc));
 
-        // Print directory name if different
+        // Format agents list
+        let agents_str = if skill.installations.is_empty() {
+            "-".to_string()
+        } else {
+            skill
+                .installations
+                .iter()
+                .map(|inst| format!("{}({})", inst.agent, inst.scope))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        // Format the row
+        let row = format!(
+            "{:<width_name$}  {:<width_desc$}  {}",
+            name_with_status,
+            desc,
+            agents_str,
+            width_name = name_width,
+            width_desc = desc_width
+        );
+
+        // Print with appropriate color for the status
+        if skill.managed {
+            output.print_success(&row);
+        } else {
+            output.print_warning(&row);
+        }
+
+        // Print directory name note if different
         if let Some(ref dir_name) = skill.directory_name {
-            output.print_info(&format!("  dir: {}", dir_name));
+            output.print_info(&format!(
+                "{:<width_name$}  (directory: {})",
+                "",
+                dir_name,
+                width_name = name_width
+            ));
         }
-
-        // Print installations
-        if !skill.installations.is_empty() {
-            let mut agent_str = String::new();
-            for (i, inst) in skill.installations.iter().enumerate() {
-                if i > 0 {
-                    agent_str.push_str(", ");
-                }
-                agent_str.push_str(&format!("{} ({})", inst.agent, inst.scope));
-            }
-            output.print_info(&format!("  agents: {}", agent_str));
-        }
-
-        output.print_info("");
     }
 }
 
