@@ -97,3 +97,8 @@ Format:
 - **Started**: 2026-01-18T23:15:00Z
 - **Ended**: 2026-01-18T23:30:00Z
 - **Notes**: Created src/utils/atomic.rs with atomic file operations: copy_skill_dir() (rejects symlinks, excludes .git, with rollback), atomic_move_dir() (atomic rename with copy+remove fallback), and safe_remove_dir() (with confirmation check). 11 comprehensive unit tests covering basic copy, git exclusion, symlink rejection, rollback, atomic moves, and safe removal. All 123 tests pass.
+
+### M1-E05-T04 — claude — done
+- **Started**: 2026-01-18T23:30:00Z
+- **Ended**: 2026-01-18T23:45:00Z
+- **Notes**: Created integration tests for filesystem utilities in tests/filesystem_utils_test.rs. All 7 subtasks covered: symlink creation/reading, symlink to non-existent target detection, atomic copy with temp directory, atomic move preserves content, permission error handling, copy_skill_dir rejects symlinks, and .git directory exclusion. All 169 tests pass (123 unit + 9 integration + 9 common + 13 parser + 15 doc).
