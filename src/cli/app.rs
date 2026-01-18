@@ -74,7 +74,27 @@ EXAMPLES:
     sikil list --json
         Output in JSON format
 "##)]
-    List,
+    List {
+        /// Filter by agent name
+        #[arg(short, long, value_name = "AGENT")]
+        agent: Option<String>,
+
+        /// Show only managed skills
+        #[arg(short, long, conflicts_with = "unmanaged")]
+        managed: bool,
+
+        /// Show only unmanaged skills
+        #[arg(short, long, conflicts_with = "managed")]
+        unmanaged: bool,
+
+        /// Show only conflicting skills
+        #[arg(short, long)]
+        conflicts: bool,
+
+        /// Show only duplicate skills
+        #[arg(short, long)]
+        duplicates: bool,
+    },
 
     /// Show detailed information about a skill
     #[command(after_help = r##"

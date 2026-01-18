@@ -2,6 +2,7 @@ use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{execute_list, ListArgs};
 use sikil::core::config::Config;
+use sikil::core::skill::Agent;
 use sikil::utils::paths::get_config_path;
 
 fn main() {
@@ -26,10 +27,41 @@ fn main() {
 
     // Dispatch to command handlers
     match cli.command {
-        sikil::cli::Commands::List => {
+        sikil::cli::Commands::List {
+            agent,
+            managed,
+            unmanaged,
+            conflicts,
+            duplicates,
+        } => {
+            // Parse agent filter if provided
+            let agent_filter = match agent {
+                Some(name) => match Agent::from_cli_name(&name) {
+                    Some(a) => Some(a),
+                    None => {
+                        eprintln!("Error: Unknown agent '{}'", name);
+                        eprintln!(
+                            "Valid agents: {}",
+                            Agent::all()
+                                .iter()
+                                .map(|a| a.cli_name())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                        std::process::exit(1);
+                    }
+                },
+                None => None,
+            };
+
             let args = ListArgs {
                 json_mode: cli.json,
                 no_cache: cli.no_cache,
+                agent_filter,
+                managed_only: managed,
+                unmanaged_only: unmanaged,
+                conflicts_only: conflicts,
+                duplicates_only: duplicates,
             };
             if let Err(e) = execute_list(args, &config) {
                 eprintln!("Error: {}", e);

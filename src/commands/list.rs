@@ -6,8 +6,9 @@
 use crate::cli::output::Output;
 use crate::core::config::Config;
 use crate::core::scanner::Scanner;
-use crate::core::skill::{Scope, Skill};
+use crate::core::skill::{Agent, Scope, Skill};
 use anyhow::Result;
+use std::collections::HashMap;
 
 /// Arguments for the list command
 #[derive(Debug, Clone)]
@@ -16,6 +17,16 @@ pub struct ListArgs {
     pub json_mode: bool,
     /// Whether to disable cache
     pub no_cache: bool,
+    /// Filter by agent name
+    pub agent_filter: Option<Agent>,
+    /// Filter to show only managed skills
+    pub managed_only: bool,
+    /// Filter to show only unmanaged skills
+    pub unmanaged_only: bool,
+    /// Filter to show only conflicting skills
+    pub conflicts_only: bool,
+    /// Filter to show only duplicate skills
+    pub duplicates_only: bool,
 }
 
 /// Output format for a single skill in the list
@@ -85,8 +96,11 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     // Get all skills
     let skills = scan_result.all_skills();
 
+    // Apply filters
+    let filtered_skills = apply_filters(&skills, &args);
+
     // Check if any skills were found
-    if skills.is_empty() {
+    if filtered_skills.is_empty() {
         if args.json_mode {
             output.print_json(&Vec::<ListSkillOutput>::new())?;
         } else {
@@ -99,7 +113,7 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     let mut managed_skills: Vec<&Skill> = Vec::new();
     let mut unmanaged_skills: Vec<&Skill> = Vec::new();
 
-    for skill in &skills {
+    for skill in &filtered_skills {
         if skill.is_managed {
             managed_skills.push(skill);
         } else {
@@ -155,6 +169,89 @@ fn format_scope(scope: Scope) -> String {
         Scope::Global => "global".to_string(),
         Scope::Workspace => "workspace".to_string(),
     }
+}
+
+/// Applies filters to a list of skills based on the provided arguments
+fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
+    let mut filtered: Vec<&Skill> = skills.iter().collect();
+
+    // Apply --agent filter
+    if let Some(agent) = args.agent_filter {
+        filtered = filtered
+            .into_iter()
+            .filter(|skill| skill.installations.iter().any(|inst| inst.agent == agent))
+            .collect();
+    }
+
+    // Apply --managed filter
+    if args.managed_only {
+        filtered = filtered
+            .into_iter()
+            .filter(|skill| skill.is_managed)
+            .collect();
+    }
+
+    // Apply --unmanaged filter
+    if args.unmanaged_only {
+        filtered = filtered
+            .into_iter()
+            .filter(|skill| !skill.is_managed)
+            .collect();
+    }
+
+    // Apply --conflicts filter (skills with both managed and unmanaged installations)
+    if args.conflicts_only {
+        // Build a map of skill name to count of different physical paths
+        let mut path_counts: HashMap<String, Vec<String>> = HashMap::new();
+
+        for skill in &filtered {
+            let mut paths: Vec<String> = Vec::new();
+            for inst in &skill.installations {
+                let path_str = inst.path.to_string_lossy().to_string();
+                if !paths.contains(&path_str) {
+                    paths.push(path_str);
+                }
+            }
+            path_counts.insert(skill.metadata.name.clone(), paths);
+        }
+
+        filtered = filtered
+            .into_iter()
+            .filter(|skill| {
+                // A conflict exists when the same skill name appears at multiple paths
+                // or when a skill is marked as managed but also has unmanaged installations
+                let paths = path_counts.get(&skill.metadata.name);
+                match paths {
+                    Some(ps) if ps.len() > 1 => true,
+                    _ => skill.is_managed && skill.installations.len() > 1,
+                }
+            })
+            .collect();
+    }
+
+    // Apply --duplicates filter (skills with the same name at multiple paths)
+    if args.duplicates_only {
+        // Build a map of skill name to number of unique physical paths
+        let mut path_counts: HashMap<String, usize> = HashMap::new();
+
+        for skill in &filtered {
+            let mut unique_paths = std::collections::HashSet::new();
+            for inst in &skill.installations {
+                unique_paths.insert(inst.path.clone());
+            }
+            path_counts.insert(skill.metadata.name.clone(), unique_paths.len());
+        }
+
+        filtered = filtered
+            .into_iter()
+            .filter(|skill| {
+                // Duplicates exist when the same skill name appears at multiple paths
+                path_counts.get(&skill.metadata.name).copied().unwrap_or(0) > 1
+            })
+            .collect();
+    }
+
+    filtered
 }
 
 /// Prints human-readable output for the list command
@@ -284,6 +381,11 @@ mod tests {
         let args = ListArgs {
             json_mode: false,
             no_cache: true,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
         };
 
         let config = Config::new(); // Empty config
@@ -298,9 +400,325 @@ mod tests {
         let args = ListArgs {
             json_mode: true,
             no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
         };
 
         assert!(args.json_mode);
         assert!(!args.no_cache);
+    }
+
+    #[test]
+    fn test_apply_filters_agent_filter() {
+        use std::path::PathBuf;
+
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill1".to_string(), "A skill".to_string()),
+            "skill1".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill1"),
+            Scope::Global,
+        ));
+
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "skill2".to_string(),
+                "Another skill".to_string(),
+            ),
+            "skill2".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skill2"),
+            Scope::Global,
+        ));
+
+        let skill3 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill3".to_string(), "Third skill".to_string()),
+            "skill3".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill3"),
+            Scope::Global,
+        ))
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skill3"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2, skill3];
+
+        // Filter by Claude Code
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: Some(Agent::ClaudeCode),
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].metadata.name, "skill1");
+        assert_eq!(filtered[1].metadata.name, "skill3");
+    }
+
+    #[test]
+    fn test_apply_filters_managed_only() {
+        use std::path::PathBuf;
+
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill1".to_string(), "A skill".to_string()),
+            "skill1".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill1"),
+            Scope::Global,
+        ));
+
+        let mut skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "skill2".to_string(),
+                "Another skill".to_string(),
+            ),
+            "skill2".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill2"),
+            Scope::Global,
+        ));
+        skill2.is_managed = true;
+
+        let skills = vec![skill1, skill2];
+
+        // Filter by managed only
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: true,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "skill2");
+        assert!(filtered[0].is_managed);
+    }
+
+    #[test]
+    fn test_apply_filters_unmanaged_only() {
+        use std::path::PathBuf;
+
+        let mut skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill1".to_string(), "A skill".to_string()),
+            "skill1".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill1"),
+            Scope::Global,
+        ));
+        skill1.is_managed = true;
+
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "skill2".to_string(),
+                "Another skill".to_string(),
+            ),
+            "skill2".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill2"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // Filter by unmanaged only
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: true,
+            conflicts_only: false,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "skill2");
+        assert!(!filtered[0].is_managed);
+    }
+
+    #[test]
+    fn test_apply_filters_duplicates() {
+        use std::path::PathBuf;
+
+        // Skill with duplicate paths (same name, different physical locations)
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "duplicate-skill".to_string(),
+                "A duplicate".to_string(),
+            ),
+            "duplicate-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/duplicate-skill"),
+            Scope::Global,
+        ))
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skills/duplicate-skill"),
+            Scope::Global,
+        ));
+
+        // Skill with single installation
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "unique-skill".to_string(),
+                "A unique skill".to_string(),
+            ),
+            "unique-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/unique-skill"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // Filter by duplicates only
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: true,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "duplicate-skill");
+    }
+
+    #[test]
+    fn test_apply_filters_no_filters() {
+        use std::path::PathBuf;
+
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill1".to_string(), "A skill".to_string()),
+            "skill1".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill1"),
+            Scope::Global,
+        ));
+
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "skill2".to_string(),
+                "Another skill".to_string(),
+            ),
+            "skill2".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skill2"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // No filters applied
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_apply_filters_agent_and_managed() {
+        use std::path::PathBuf;
+
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill1".to_string(), "A skill".to_string()),
+            "skill1".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill1"),
+            Scope::Global,
+        ));
+
+        let mut skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "skill2".to_string(),
+                "Another skill".to_string(),
+            ),
+            "skill2".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skill2"),
+            Scope::Global,
+        ));
+        skill2.is_managed = true;
+
+        let skill3 = Skill::new(
+            crate::core::skill::SkillMetadata::new("skill3".to_string(), "Third skill".to_string()),
+            "skill3".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skill3"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2, skill3];
+
+        // Filter by Claude Code AND managed only
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: Some(Agent::ClaudeCode),
+            managed_only: true,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "skill2");
+        assert!(filtered[0].is_managed);
     }
 }
