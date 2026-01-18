@@ -8,9 +8,11 @@ use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
 use crate::core::skill::{Agent, Installation, Scope, Skill, SkillMetadata};
+use crate::utils::paths::get_repo_path;
 use crate::utils::symlink::read_symlink_target;
 use fs_err as fs;
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 
 /// A single skill entry found during scanning
@@ -294,6 +296,153 @@ impl Scanner {
 
         // Parse the SKILL.md file
         parse_skill_md(skill_md_path)
+    }
+
+    /// Scans all configured agent directories for skills
+    ///
+    /// This method performs a comprehensive scan across:
+    /// 1. Global paths for all enabled agents
+    /// 2. Workspace paths relative to current working directory
+    /// 3. The managed skills repository (~/.sikil/repo/)
+    ///
+    /// Non-existent directories are skipped gracefully.
+    ///
+    /// # Returns
+    ///
+    /// A `ScanResult` containing all discovered skills aggregated by name
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use sikil::core::scanner::Scanner;
+    /// use sikil::core::config::Config;
+    ///
+    /// let config = Config::default();
+    /// let scanner = Scanner::new(config);
+    /// let result = scanner.scan_all_agents();
+    ///
+    /// println!("Found {} skills", result.skill_count());
+    /// ```
+    pub fn scan_all_agents(&self) -> ScanResult {
+        let mut result = ScanResult::new();
+
+        // Scan global paths for all enabled agents
+        for (agent_name, agent_config) in &self.config.agents {
+            if !agent_config.enabled {
+                continue;
+            }
+
+            // Parse agent name to Agent enum
+            if let Some(agent) = Agent::from_cli_name(agent_name) {
+                // Scan global path
+                if agent_config.global_path.exists() {
+                    if let Err(e) = self.scan_directory(
+                        &agent_config.global_path,
+                        agent,
+                        Scope::Global,
+                        &mut result,
+                    ) {
+                        // Log error but continue scanning other paths
+                        result.add_error(agent_config.global_path.clone(), e.to_string());
+                    }
+                }
+
+                // Scan workspace path (relative to CWD)
+                let workspace_path = if agent_config.workspace_path.is_absolute() {
+                    agent_config.workspace_path.clone()
+                } else {
+                    // Relative to current working directory
+                    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                    cwd.join(&agent_config.workspace_path)
+                };
+
+                if workspace_path.exists() {
+                    if let Err(e) =
+                        self.scan_directory(&workspace_path, agent, Scope::Workspace, &mut result)
+                    {
+                        result.add_error(workspace_path, e.to_string());
+                    }
+                }
+            }
+        }
+
+        // Scan the managed skills repository
+        let repo_path = get_repo_path();
+        if repo_path.exists() {
+            self.scan_repo(&repo_path, &mut result);
+        }
+
+        result
+    }
+
+    /// Scans the managed skills repository
+    ///
+    /// The repo contains skill directories stored under ~/.sikil/repo/.
+    /// Each subdirectory in the repo is a potential managed skill.
+    ///
+    /// Skills found in the repo are marked as managed, and their installations
+    /// are discovered by scanning the agent directories that may symlink to them.
+    fn scan_repo(&self, repo_path: &Path, result: &mut ScanResult) {
+        let entries = match fs::read_dir(repo_path) {
+            Ok(entries) => entries,
+            Err(_) => return, // Skip if we can't read the repo
+        };
+
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+
+            // Skip non-directories
+            if !entry_path.is_dir() {
+                continue;
+            }
+
+            // Skip hidden directories
+            let dir_name = match entry_path.file_name() {
+                Some(name) => name.to_string_lossy().to_string(),
+                None => continue,
+            };
+            if dir_name.starts_with('.') {
+                continue;
+            }
+
+            // Try to parse SKILL.md
+            let skill_md_path = entry_path.join("SKILL.md");
+            match self.parse_skill_entry(&skill_md_path, &entry_path, &dir_name) {
+                Ok(metadata) => {
+                    // Create a skill entry for the repo
+                    let skill_entry = SkillEntry::new(
+                        metadata,
+                        dir_name.clone(),
+                        entry_path.clone(),
+                        false,
+                        None,
+                        None, // No specific agent in repo
+                        Scope::Global,
+                    );
+
+                    // Convert to skill and mark as managed
+                    let mut skill = skill_entry.to_skill();
+                    skill.is_managed = true;
+                    skill.repo_path = Some(entry_path);
+
+                    // Add to result or merge with existing
+                    let skill_name = skill.metadata.name.clone();
+                    result.entries_found += 1;
+
+                    if let Some(existing) = result.skills.get_mut(&skill_name) {
+                        // Update managed status
+                        existing.is_managed = true;
+                        existing.repo_path = skill.repo_path;
+                    } else {
+                        result.skills.insert(skill_name, skill);
+                    }
+                }
+                Err(e) => {
+                    // Record error but continue scanning
+                    result.add_error(skill_md_path, e.to_string());
+                }
+            }
+        }
     }
 }
 
@@ -851,6 +1000,376 @@ description: A workspace skill
             )
             .unwrap();
 
+        let skill = &result.skills["workspace-skill"];
+        assert_eq!(skill.installations[0].scope, Scope::Workspace);
+    }
+
+    #[test]
+    fn test_scan_all_agents_empty_config() {
+        let config = Config::new(); // Empty config, no agents
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Should have scanned nothing since no agents are configured
+        assert_eq!(result.skill_count(), 0);
+        assert_eq!(result.entries_found, 0);
+    }
+
+    #[test]
+    fn test_scan_all_agents_with_default_config() {
+        let config = Config::default();
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Should complete without error even if no skills exist
+        // (directories likely don't exist on test system)
+        assert!(result.skill_count() >= 0);
+    }
+
+    #[test]
+    fn test_scan_all_agents_with_mock_directories() {
+        let temp_base = TempDir::new().unwrap();
+        let temp_workspace = TempDir::new().unwrap();
+
+        // Create mock global directories for Claude Code
+        let claude_global = temp_base
+            .path()
+            .join("global")
+            .join("claude")
+            .join("skills");
+        fs::create_dir_all(&claude_global).unwrap();
+
+        // Create a skill in Claude Code global
+        let skill_dir = claude_global.join("test-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: test-skill
+description: A test skill
+---"#,
+        )
+        .unwrap();
+
+        // Create a config that points to our temp directories
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                claude_global.clone(),
+                PathBuf::from(".nowhere"), // Use a path that won't exist in temp_workspace
+            ),
+        );
+
+        // Change to workspace temp directory for workspace scan
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(temp_workspace.path()).unwrap();
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("test-skill"));
+    }
+
+    #[test]
+    fn test_scan_all_agents_skips_nonexistent_directories() {
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                PathBuf::from("/nonexistent/global/path"),
+                PathBuf::from("/nonexistent/workspace/path"),
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Should not error, just return empty results
+        assert_eq!(result.skill_count(), 0);
+        assert_eq!(result.entries_found, 0);
+    }
+
+    #[test]
+    fn test_scan_all_agents_disabled_agent_skipped() {
+        let temp_base = TempDir::new().unwrap();
+
+        // Create directory for enabled agent
+        let windsurf_global = temp_base.path().join("windsurf").join("skills");
+        fs::create_dir_all(&windsurf_global).unwrap();
+
+        // Create a skill
+        let skill_dir = windsurf_global.join("windsurf-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: windsurf-skill
+description: A Windsurf skill
+---"#,
+        )
+        .unwrap();
+
+        // Create config with enabled and disabled agents
+        let mut config = Config::new();
+        config.insert_agent(
+            "windsurf".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                windsurf_global,
+                PathBuf::from(".windsurf/skills"),
+            ),
+        );
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                false, // Disabled
+                PathBuf::from("/nonexistent/claude"),
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Should only find the Windsurf skill
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("windsurf-skill"));
+    }
+
+    #[test]
+    fn test_scan_all_agents_aggregates_by_skill_name() {
+        let temp_base = TempDir::new().unwrap();
+
+        // Create directories for two agents
+        let claude_global = temp_base.path().join("claude").join("skills");
+        let windsurf_global = temp_base.path().join("windsurf").join("skills");
+        fs::create_dir_all(&claude_global).unwrap();
+        fs::create_dir_all(&windsurf_global).unwrap();
+
+        // Create the same skill in both agent directories
+        for base in [&claude_global, &windsurf_global] {
+            let skill_dir = base.join("shared-skill");
+            fs::create_dir(&skill_dir).unwrap();
+            fs::write(
+                skill_dir.join("SKILL.md"),
+                r#"---
+name: shared-skill
+description: A skill shared across agents
+---"#,
+            )
+            .unwrap();
+        }
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                claude_global,
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+        config.insert_agent(
+            "windsurf".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                windsurf_global,
+                PathBuf::from(".windsurf/skills"),
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Should have one skill with two installations
+        assert_eq!(result.skill_count(), 1);
+        let skill = &result.skills["shared-skill"];
+        assert_eq!(skill.installations.len(), 2);
+
+        // Verify both agents are represented
+        let agents: Vec<_> = skill.installations.iter().map(|i| i.agent).collect();
+        assert!(agents.contains(&Agent::ClaudeCode));
+        assert!(agents.contains(&Agent::Windsurf));
+    }
+
+    #[test]
+    fn test_scan_repo_with_managed_skills() {
+        let temp_repo = TempDir::new().unwrap();
+
+        // Create a managed skill in the repo
+        let skill_dir = temp_repo.path().join("managed-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: managed-skill
+description: A managed skill
+---"#,
+        )
+        .unwrap();
+
+        let mut config = Config::new();
+        // Override repo path for testing
+        // Note: We can't easily override get_repo_path, so we'll test scan_repo directly
+
+        let scanner = Scanner::new(config);
+        let mut result = ScanResult::new();
+
+        scanner.scan_repo(temp_repo.path(), &mut result);
+
+        assert_eq!(result.skill_count(), 1);
+        let skill = &result.skills["managed-skill"];
+        assert!(skill.is_managed);
+        assert_eq!(skill.repo_path, Some(skill_dir.clone()));
+    }
+
+    #[test]
+    fn test_scan_repo_skips_hidden_directories() {
+        let temp_repo = TempDir::new().unwrap();
+
+        // Create hidden directory with skill
+        let hidden_dir = temp_repo.path().join(".hidden-skill");
+        fs::create_dir(&hidden_dir).unwrap();
+        fs::write(
+            hidden_dir.join("SKILL.md"),
+            r#"---
+name: hidden-skill
+description: Should be skipped
+---"#,
+        )
+        .unwrap();
+
+        // Create normal directory
+        let normal_dir = temp_repo.path().join("normal-skill");
+        fs::create_dir(&normal_dir).unwrap();
+        fs::write(
+            normal_dir.join("SKILL.md"),
+            r#"---
+name: normal-skill
+description: Should be found
+---"#,
+        )
+        .unwrap();
+
+        let config = Config::default();
+        let scanner = Scanner::new(config);
+        let mut result = ScanResult::new();
+
+        scanner.scan_repo(temp_repo.path(), &mut result);
+
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("normal-skill"));
+        assert!(!result.skills.contains_key("hidden-skill"));
+    }
+
+    #[test]
+    fn test_scan_repo_merges_with_existing_skill() {
+        let temp_repo = TempDir::new().unwrap();
+        let temp_agent_dir = TempDir::new().unwrap();
+
+        // Create managed skill in repo
+        let repo_skill = temp_repo.path().join("repo-skill");
+        fs::create_dir(&repo_skill).unwrap();
+        fs::write(
+            repo_skill.join("SKILL.md"),
+            r#"---
+name: my-skill
+description: A managed skill
+---"#,
+        )
+        .unwrap();
+
+        // Create symlink in agent directory
+        let agent_skill = temp_agent_dir.path().join("my-skill");
+        std::os::unix::fs::symlink(&repo_skill, &agent_skill).unwrap();
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                temp_agent_dir.path().to_path_buf(),
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let mut result = ScanResult::new();
+
+        // First scan agent directory
+        scanner
+            .scan_directory(
+                temp_agent_dir.path(),
+                Agent::ClaudeCode,
+                Scope::Global,
+                &mut result,
+            )
+            .unwrap();
+
+        // Then scan repo (should merge)
+        scanner.scan_repo(temp_repo.path(), &mut result);
+
+        // Should have one skill that is marked as managed
+        assert_eq!(result.skill_count(), 1);
+        let skill = &result.skills["my-skill"];
+        assert!(skill.is_managed);
+        assert_eq!(skill.repo_path, Some(repo_skill));
+        assert_eq!(skill.installations.len(), 1);
+    }
+
+    #[test]
+    fn test_scan_all_agents_with_workspace_path() {
+        let temp_base = TempDir::new().unwrap();
+
+        // Create mock workspace directory
+        let workspace_dir = temp_base.path().join(".claude").join("skills");
+        fs::create_dir_all(&workspace_dir).unwrap();
+
+        // Create a workspace skill
+        let skill_dir = workspace_dir.join("workspace-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: workspace-skill
+description: A workspace-local skill
+---"#,
+        )
+        .unwrap();
+
+        // Change to temp directory
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(temp_base.path()).unwrap();
+
+        // Create config with relative workspace path
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                PathBuf::from("/nonexistent/global"), // Doesn't exist
+                PathBuf::from(".claude/skills"),      // Relative workspace path
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+
+        // Should find the workspace skill
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("workspace-skill"));
+
+        // Verify it's a workspace installation
         let skill = &result.skills["workspace-skill"];
         assert_eq!(skill.installations[0].scope, Scope::Workspace);
     }

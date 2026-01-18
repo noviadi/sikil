@@ -5,7 +5,7 @@ Quick View
 | Milestone | Status | Tasks Done | Total Tasks |
 |-----------|--------|------------|-------------|
 | M1: Foundation | Complete | 21/21 | 21 |
-| M2: Discovery | Not Started | 0/19 | 19 |
+| M2: Discovery | In Progress (2/19) | 2/19 | 19 |
 | M3: Management | Not Started | 0/19 | 19 |
 | M4: Sync & Config | Not Started | 0/10 | 10 |
 | M5: Polish | Not Started | 0/13 | 13 |
@@ -47,7 +47,40 @@ Quick View
 ### M1-E07: Caching System (1/1 done) - COMPLETE
 - [x] M1-E07-T01: Cache Storage & API `[DEP: M1-E03-T02]`
 
+## M2: Discovery (2/19 done) - IN PROGRESS
+
+### M2-E01: Directory Scanner (2/5 done) - IN PROGRESS
+- [x] M2-E01-T01: Implement Scanner Core `[DEP: M1-E04-T02, M1-E03-T02]`
+- [x] M2-E01-T02: Implement Multi-Agent Scanning `[DEP: M2-E01-T01]`
+- [ ] M2-E01-T03: Managed/Unmanaged Classification `[DEP: M2-E01-T02]`
+- [ ] M2-E01-T04: Test Scanner `[DEP: M2-E01-T03]`
+- [ ] M2-E01-T05: Integrate Cache with Scanner `[DEP: M2-E01-T01, M1-E07-T01]`
+
+### M2-E02: List Command (0/5 done) - NOT STARTED
+- [ ] M2-E02-T01: Implement List Logic `[DEP: M2-E01-T03]`
+- [ ] M2-E02-T02: Implement List Filters `[DEP: M2-E02-T01]`
+- [ ] M2-E02-T03: Implement List Output `[DEP: M2-E02-T02]`
+- [ ] M2-E02-T04: Wire List Command to CLI `[DEP: M2-E02-T03]`
+- [ ] M2-E02-T05: Test List Command `[DEP: M2-E02-T04]`
+
+### M2-E03: Show Command (0/4 done) - NOT STARTED
+- [ ] M2-E03-T01: Implement Show Logic `[DEP: M2-E01-T03]`
+- [ ] M2-E03-T02: Implement Show Output `[DEP: M2-E03-T01]`
+- [ ] M2-E03-T03: Wire Show Command to CLI `[DEP: M2-E03-T02]`
+- [ ] M2-E03-T04: Test Show Command `[DEP: M2-E03-T03]`
+
+### M2-E04: Validate Command (0/4 done) - NOT STARTED
+- [ ] M2-E04-T01: Implement Validation Logic `[DEP: M1-E04-T03]`
+- [ ] M2-E04-T02: Implement Validation Output `[DEP: M2-E04-T01]`
+- [ ] M2-E04-T03: Wire Validate Command to CLI `[DEP: M2-E04-T02]`
+- [ ] M2-E04-T04: Test Validate Command `[DEP: M2-E04-T03]`
+
+### M2-E05: Conflict Detection (0/3 done) - NOT STARTED
+- [ ] M2-E05-T01: Implement Conflict Logic `[DEP: M2-E01-T03]`
+- [ ] M2-E05-T02: Implement Conflict Output `[DEP: M2-E05-T01]`
+- [ ] M2-E05-T03: Test Conflict Detection `[DEP: M2-E05-T02]`
+
 ## Next Eligible Tasks
 
-1. **M2-E01-T01** - Implement Scanner Core `[DEP: M1-E04-T02, M1-E03-T02]`
-   - All dependencies satisfied (M1-E04-T02 and M1-E03-T02 are done)
+1. **M2-E01-T03** - Managed/Unmanaged Classification `[DEP: M2-E01-T02]`
+   - All dependencies satisfied (M2-E01-T02 is done)
