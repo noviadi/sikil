@@ -5,7 +5,12 @@ Select the task by reading:
 - specs/implementation_roadmap.md (eligibility + subtasks)
 
 Rules:
-- Eligible = not done AND all [DEP: ...] are done; STOP if none eligible.
-- When finished: run ./scripts/verify.sh, then ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>".
-- If anything is unclear, follow AGENTS.md (already loaded in context).
+- Eligible = not done AND all [DEP: ...] are done.
+- If no eligible task, respond "No eligible tasks" and STOP.
+- If any step fails, STOP and fix before proceeding.
+- When finished:
+  1. ./scripts/verify.sh (must pass before continuing)
+  2. ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
+  3. git add -A && git commit (include implementation + STATE.yaml + LOG.md)
+- Final response MUST include the commit hash.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sikil - Atomic task completion script
 # Updates STATE.yaml and LOG.md in one operation
-# Usage: ./scripts/complete-task.sh <TASK_ID> <AGENT> "<NOTES>"
+# Usage: ./scripts/complete-task.sh <TASK_ID> <AGENT> "<NOTES>" [--force]
 
 set -euo pipefail
 
@@ -13,27 +13,57 @@ NC='\033[0m'
 STATE_FILE="docs/plan/STATE.yaml"
 LOG_FILE="docs/plan/LOG.md"
 
+# Portable sed -i (macOS BSD sed vs GNU sed)
+sedi() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 usage() {
-    echo "Usage: $0 <TASK_ID> <AGENT> \"<NOTES>\""
+    echo "Usage: $0 <TASK_ID> <AGENT> \"<NOTES>\" [--force]"
     echo ""
     echo "Arguments:"
     echo "  TASK_ID   Task identifier (e.g., M2-E01-T05)"
     echo "  AGENT     Agent name (e.g., claude, amp-agent)"
     echo "  NOTES     Brief summary of work done"
+    echo "  --force   Skip focus mismatch check"
     echo ""
     echo "Example:"
     echo "  $0 M2-E01-T05 claude \"Implemented cache integration with 8 tests\""
     exit 1
 }
 
-# Validate arguments
-if [ $# -ne 3 ]; then
+# Parse arguments
+FORCE=false
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force)
+            FORCE=true
+            shift
+            ;;
+        -*)
+            echo -e "${RED}Error: Unknown option $1${NC}"
+            usage
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [ ${#POSITIONAL[@]} -ne 3 ]; then
     usage
 fi
 
-TASK_ID="$1"
-AGENT="$2"
-NOTES="$3"
+TASK_ID="${POSITIONAL[0]}"
+AGENT="${POSITIONAL[1]}"
+NOTES="${POSITIONAL[2]}"
 
 # Validate files exist
 if [ ! -f "$STATE_FILE" ]; then
@@ -54,10 +84,11 @@ DATE_HEADER=$(date -u +"%Y-%m-%d")
 CURRENT_FOCUS=$(grep -A1 "^focus:" "$STATE_FILE" | grep "current_task:" | sed 's/.*current_task: *//' | tr -d '"' | tr -d ' ')
 
 if [ "$CURRENT_FOCUS" != "$TASK_ID" ] && [ "$CURRENT_FOCUS" != "null" ]; then
-    echo -e "${YELLOW}Warning: Current focus is '$CURRENT_FOCUS', not '$TASK_ID'${NC}"
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [ "$FORCE" = true ]; then
+        echo -e "${YELLOW}Warning: Current focus is '$CURRENT_FOCUS', not '$TASK_ID' (--force used)${NC}"
+    else
+        echo -e "${RED}Error: Current focus is '$CURRENT_FOCUS', not '$TASK_ID'${NC}"
+        echo "Use --force to override this check"
         exit 1
     fi
 fi
@@ -69,10 +100,10 @@ echo ""
 echo "Updating $STATE_FILE..."
 
 # Update updated_at
-sed -i "s/^updated_at:.*/updated_at: \"$TIMESTAMP\"/" "$STATE_FILE"
+sedi "s/^updated_at:.*/updated_at: \"$TIMESTAMP\"/" "$STATE_FILE"
 
 # Clear focus
-sed -i '/^focus:/,/^[^ ]/{
+sedi '/^focus:/,/^[^ ]/{
   s/current_task:.*/current_task: null/
   s/by:.*/by: null/
 }' "$STATE_FILE"
@@ -80,11 +111,11 @@ sed -i '/^focus:/,/^[^ ]/{
 # Add task entry if not exists, or update if exists
 if grep -q "\"$TASK_ID\":" "$STATE_FILE"; then
     # Update existing entry
-    sed -i "s/\"$TASK_ID\":.*$/\"$TASK_ID\": { status: done, at: \"$TIMESTAMP\" }/" "$STATE_FILE"
+    sedi "s/\"$TASK_ID\":.*$/\"$TASK_ID\": { status: done, at: \"$TIMESTAMP\" }/" "$STATE_FILE"
 else
     # Add new entry before the last task or at end of items section
     # Find the last line of items section and append
-    sed -i "/^items:/a\\  \"$TASK_ID\": { status: done, at: \"$TIMESTAMP\" }" "$STATE_FILE"
+    sedi "/^items:/a\\  \"$TASK_ID\": { status: done, at: \"$TIMESTAMP\" }" "$STATE_FILE"
 fi
 
 echo -e "  ${GREEN}✓${NC} STATE.yaml updated"
@@ -105,8 +136,7 @@ fi
 cat >> "$LOG_FILE" << EOF
 
 ### $TASK_ID — $AGENT — done
-- **Started**: $TIMESTAMP
-- **Ended**: $TIMESTAMP
+- **Completed**: $TIMESTAMP
 - **Notes**: $NOTES
 EOF
 
@@ -122,6 +152,12 @@ echo "  Agent: $AGENT"
 echo "  Notes: $NOTES"
 echo "════════════════════════════════════"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "  1. Review changes: git diff $STATE_FILE $LOG_FILE"
-echo "  2. Commit: git add $STATE_FILE $LOG_FILE && git commit"
+echo -e "${RED}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${RED}REQUIRED: Commit all changes now.${NC}"
+echo -e "${RED}Task is NOT complete until committed.${NC}"
+echo -e "${RED}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "  git add -A && git commit"
+echo ""
+echo "Include: implementation files + $STATE_FILE + $LOG_FILE"
+echo "Final response MUST include the commit hash."
