@@ -1,4 +1,4 @@
-Implement the next eligible task.
+Implement the next single eligible task.
 
 Read first:
 1. AGENTS.md - workflow
