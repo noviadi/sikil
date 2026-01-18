@@ -1,5 +1,11 @@
 # Agent Execution Guidance
 
+## IMPORTANT: One Task at a Time
+
+**Execute exactly ONE task per session.** Do not batch multiple tasks.
+
+---
+
 ## Quick Reference
 
 | File | Purpose |
@@ -14,9 +20,11 @@
 
 ### 1. Pick Task
 1. Read `docs/plan/STATE.yaml` → check which tasks are `done`
-2. Read `specs/implementation_roadmap.md` → find smallest eligible task ID
+2. Read `specs/implementation_roadmap.md` → find **ONE** smallest eligible task ID
    - Eligible = not done + all `[DEP: ...]` are done
 3. Update STATE.yaml: `focus: { current_task: "<ID>", by: "<agent>" }`
+
+**STOP here if no eligible task. Do NOT pick multiple tasks.**
 
 ### 2. Implement
 1. Read task's subtask table in roadmap
