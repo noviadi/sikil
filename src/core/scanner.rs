@@ -9,11 +9,84 @@ use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
 use crate::core::skill::{Agent, Installation, Scope, Skill, SkillMetadata};
 use crate::utils::paths::get_repo_path;
-use crate::utils::symlink::read_symlink_target;
+use crate::utils::symlink::{read_symlink_target, resolve_realpath};
 use fs_err as fs;
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
+
+/// Classification of a skill installation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InstallationType {
+    /// Managed skill: symlink pointing to ~/.sikil/repo/
+    Managed,
+    /// Unmanaged skill: physical directory
+    Unmanaged,
+    /// Broken symlink: target does not exist
+    BrokenSymlink,
+    /// Foreign symlink: points to location outside ~/.sikil/repo/
+    ForeignSymlink,
+}
+
+/// Classifies a skill installation by its type.
+///
+/// This function determines whether a skill installation is:
+/// - **Managed**: A symlink pointing to `~/.sikil/repo/`
+/// - **Unmanaged**: A physical directory (not a symlink)
+/// - **BrokenSymlink**: A symlink whose target does not exist
+/// - **ForeignSymlink**: A symlink pointing outside `~/.sikil/repo/`
+///
+/// # Arguments
+///
+/// * `path` - The path to the skill installation to classify
+///
+/// # Returns
+///
+/// An `InstallationType` indicating how the skill is installed
+///
+/// # Examples
+///
+/// ```no_run
+/// use sikil::core::scanner::classify_installation;
+/// use std::path::Path;
+///
+/// let installation_type = classify_installation(Path::new("~/.claude/skills/my-skill"));
+/// match installation_type {
+///     sikil::core::scanner::InstallationType::Managed => {
+///         println!("This skill is managed by Sikil");
+///     }
+///     sikil::core::scanner::InstallationType::Unmanaged => {
+///         println!("This skill is unmanaged");
+///     }
+///     _ => {}
+/// }
+/// ```
+pub fn classify_installation(path: &Path) -> InstallationType {
+    use crate::utils::symlink::is_symlink;
+
+    // Check if it's a symlink
+    if is_symlink(path) {
+        // Try to resolve the symlink target
+        match resolve_realpath(path) {
+            Ok(real_target) => {
+                // Check if the target is under the repo path
+                let repo_path = get_repo_path();
+                if real_target.starts_with(&repo_path) {
+                    InstallationType::Managed
+                } else {
+                    InstallationType::ForeignSymlink
+                }
+            }
+            Err(_) => {
+                // Failed to resolve - likely a broken symlink
+                InstallationType::BrokenSymlink
+            }
+        }
+    } else {
+        // Not a symlink - it's a physical directory (unmanaged)
+        InstallationType::Unmanaged
+    }
+}
 
 /// A single skill entry found during scanning
 #[derive(Debug, Clone)]
@@ -1023,7 +1096,8 @@ description: A workspace skill
 
         // Should complete without error even if no skills exist
         // (directories likely don't exist on test system)
-        assert!(result.skill_count() >= 0);
+        // skill_count() returns usize which is always >= 0
+        assert!(result.skill_count() < 100);
     }
 
     #[test]
@@ -1215,7 +1289,7 @@ description: A managed skill
         )
         .unwrap();
 
-        let mut config = Config::new();
+        let config = Config::new();
         // Override repo path for testing
         // Note: We can't easily override get_repo_path, so we'll test scan_repo directly
 
@@ -1327,9 +1401,10 @@ description: A managed skill
     #[test]
     fn test_scan_all_agents_with_workspace_path() {
         let temp_base = TempDir::new().unwrap();
+        let temp_path = temp_base.into_path(); // Prevent auto-drop while we're in it
 
         // Create mock workspace directory
-        let workspace_dir = temp_base.path().join(".claude").join("skills");
+        let workspace_dir = temp_path.join(".claude").join("skills");
         fs::create_dir_all(&workspace_dir).unwrap();
 
         // Create a workspace skill
@@ -1346,7 +1421,7 @@ description: A workspace-local skill
 
         // Change to temp directory
         let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_base.path()).unwrap();
+        env::set_current_dir(&temp_path).unwrap();
 
         // Create config with relative workspace path
         let mut config = Config::new();
@@ -1372,5 +1447,77 @@ description: A workspace-local skill
         // Verify it's a workspace installation
         let skill = &result.skills["workspace-skill"];
         assert_eq!(skill.installations[0].scope, Scope::Workspace);
+    }
+
+    #[test]
+    fn test_classify_installation_unmanaged() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a physical directory
+        let skill_dir = temp_dir.path().join("unmanaged-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), "# Test").unwrap();
+
+        // Should be classified as Unmanaged
+        let result = classify_installation(&skill_dir);
+        assert_eq!(result, InstallationType::Unmanaged);
+    }
+
+    #[test]
+    fn test_classify_installation_managed() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a mock repo structure
+        let repo = temp_dir.path().join(".sikil").join("repo");
+        let skill = repo.join("my-skill");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "# Test Skill").unwrap();
+
+        // Create symlink pointing to repo
+        let link = temp_dir.path().join("skill-link");
+        std::os::unix::fs::symlink(&skill, &link).unwrap();
+
+        // Temporarily set HOME to temp dir for this test
+        let original_home = env::var("HOME").ok();
+        env::set_var("HOME", temp_dir.path());
+
+        let result = classify_installation(&link);
+        assert_eq!(result, InstallationType::Managed);
+
+        // Restore original HOME
+        if let Some(home) = original_home {
+            env::set_var("HOME", home);
+        } else {
+            env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn test_classify_installation_broken_symlink() {
+        let temp_dir = TempDir::new().unwrap();
+        let link = temp_dir.path().join("broken-link");
+
+        // Create a symlink to a non-existent target
+        std::os::unix::fs::symlink("/nonexistent/target", &link).unwrap();
+
+        let result = classify_installation(&link);
+        assert_eq!(result, InstallationType::BrokenSymlink);
+    }
+
+    #[test]
+    fn test_classify_installation_foreign_symlink() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a skill outside the repo
+        let skill = temp_dir.path().join("other-skill");
+        fs::create_dir(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "# Test Skill").unwrap();
+
+        // Create symlink pointing outside repo
+        let link = temp_dir.path().join("skill-link");
+        std::os::unix::fs::symlink(&skill, &link).unwrap();
+
+        let result = classify_installation(&link);
+        assert_eq!(result, InstallationType::ForeignSymlink);
     }
 }
