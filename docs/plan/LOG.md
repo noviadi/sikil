@@ -175,3 +175,7 @@ Format:
 ### M2-E02-T04 — claude-opus-4-5 — done
 - **Completed**: 2026-01-18T21:33:53Z
 - **Notes**: Wired List command to CLI with proper clap argument parsing and error handling
+
+### M2-E02-T05 — claude-opus-4-5-20251101 — done
+- **Completed**: 2026-01-18T21:36:12Z
+- **Notes**: Implemented integration tests for list command covering: empty list, list with skills, --agent filter, --managed/--unmanaged filters, --json output, snapshot test, and directory name differs from metadata name
