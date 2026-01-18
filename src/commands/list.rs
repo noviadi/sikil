@@ -5,10 +5,10 @@
 
 use crate::cli::output::Output;
 use crate::core::config::Config;
+use crate::core::conflicts;
 use crate::core::scanner::Scanner;
 use crate::core::skill::{Agent, Scope, Skill};
 use anyhow::Result;
-use std::collections::HashMap;
 
 /// Arguments for the list command
 #[derive(Debug, Clone)]
@@ -98,11 +98,14 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     // Scan all agents
     let scan_result = scanner.scan_all_agents();
 
+    // Detect conflicts
+    let all_conflicts = conflicts::detect_conflicts(&scan_result);
+
     // Get all skills
     let skills = scan_result.all_skills();
 
     // Apply filters
-    let filtered_skills = apply_filters(&skills, &args);
+    let filtered_skills = apply_filters(&skills, &args, &all_conflicts);
 
     // Check if any skills were found
     if filtered_skills.is_empty() {
@@ -162,7 +165,7 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     if args.json_mode {
         output.print_json(&output_skills)?;
     } else {
-        print_human_readable(&output, &output_skills);
+        print_human_readable(&output, &output_skills, &all_conflicts);
     }
 
     Ok(())
@@ -177,7 +180,11 @@ fn format_scope(scope: Scope) -> String {
 }
 
 /// Applies filters to a list of skills based on the provided arguments
-fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
+fn apply_filters<'a>(
+    skills: &'a [Skill],
+    args: &ListArgs,
+    all_conflicts: &[crate::core::conflicts::Conflict],
+) -> Vec<&'a Skill> {
     let mut filtered: Vec<&Skill> = skills.iter().collect();
 
     // Apply --agent filter
@@ -195,67 +202,45 @@ fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
         filtered.retain(|skill| !skill.is_managed);
     }
 
-    // Apply --conflicts filter (skills with both managed and unmanaged installations)
+    // Apply --conflicts filter using the conflicts module
     if args.conflicts_only {
-        // Build a map of skill name to count of different physical paths
-        let mut path_counts: HashMap<String, Vec<String>> = HashMap::new();
+        // Get skill names that have conflicts
+        let conflict_skill_names: std::collections::HashSet<_> =
+            all_conflicts.iter().map(|c| &c.skill_name).collect();
 
-        for skill in &filtered {
-            let mut paths: Vec<String> = Vec::new();
-            for inst in &skill.installations {
-                let path_str = inst.path.to_string_lossy().to_string();
-                if !paths.contains(&path_str) {
-                    paths.push(path_str);
-                }
-            }
-            path_counts.insert(skill.metadata.name.clone(), paths);
-        }
-
-        filtered.retain(|skill| {
-            // A conflict exists when the same skill name appears at multiple paths
-            // or when a skill is marked as managed but also has unmanaged installations
-            let paths = path_counts.get(&skill.metadata.name);
-            match paths {
-                Some(ps) if ps.len() > 1 => true,
-                _ => skill.is_managed && skill.installations.len() > 1,
-            }
-        });
+        filtered.retain(|skill| conflict_skill_names.contains(&skill.metadata.name));
     }
 
-    // Apply --duplicates filter (skills with the same name at multiple paths)
+    // Apply --duplicates filter (alias for conflicts)
     if args.duplicates_only {
-        // Build a map of skill name to number of unique physical paths
-        let mut path_counts: HashMap<String, usize> = HashMap::new();
+        // Get skill names that have conflicts
+        let conflict_skill_names: std::collections::HashSet<_> =
+            all_conflicts.iter().map(|c| &c.skill_name).collect();
 
-        for skill in &filtered {
-            let mut unique_paths = std::collections::HashSet::new();
-            for inst in &skill.installations {
-                unique_paths.insert(inst.path.clone());
-            }
-            path_counts.insert(skill.metadata.name.clone(), unique_paths.len());
-        }
-
-        filtered.retain(|skill| {
-            // Duplicates exist when the same skill name appears at multiple paths
-            path_counts.get(&skill.metadata.name).copied().unwrap_or(0) > 1
-        });
+        filtered.retain(|skill| conflict_skill_names.contains(&skill.metadata.name));
     }
 
     filtered
 }
 
 /// Prints human-readable output for the list command
-fn print_human_readable(output: &Output, skills: &[ListSkillOutput]) {
+fn print_human_readable(
+    output: &Output,
+    skills: &[ListSkillOutput],
+    all_conflicts: &[crate::core::conflicts::Conflict],
+) {
     let managed_count = skills.iter().filter(|s| s.managed).count();
     let unmanaged_count = skills.len() - managed_count;
 
-    // Print header with summary
+    // Print header with summary including conflicts
+    let conflicts_summary = crate::core::conflicts::format_conflicts_summary(all_conflicts);
     output.print_info(&format!(
-        "Found {} skill{} ({} managed, {} unmanaged)",
+        "Found {} skill{} ({} managed, {} unmanaged) - {}",
         skills.len(),
         if skills.len() == 1 { "" } else { "s" },
         managed_count,
-        unmanaged_count
+        unmanaged_count,
+        conflicts_summary
     ));
 
     if skills.is_empty() {
@@ -346,6 +331,19 @@ fn print_human_readable(output: &Output, skills: &[ListSkillOutput]) {
                 dir_name,
                 width_name = name_width
             ));
+        }
+    }
+
+    // Print conflict details and recommendations if any conflicts exist
+    if !all_conflicts.is_empty() {
+        output.print_info("");
+        for conflict in all_conflicts {
+            output.print_info(&conflicts::format_conflict(conflict));
+            output.print_info("  Recommendations:");
+            for (i, rec) in conflict.recommendations().iter().enumerate() {
+                output.print_info(&format!("    {}. {}", i + 1, rec));
+            }
+            output.print_info("");
         }
     }
 }
@@ -510,7 +508,8 @@ mod tests {
             duplicates_only: false,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let conflicts = vec![];
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].metadata.name, "skill1");
         assert_eq!(filtered[1].metadata.name, "skill3");
@@ -557,7 +556,8 @@ mod tests {
             duplicates_only: false,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let conflicts = vec![];
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].metadata.name, "skill2");
         assert!(filtered[0].is_managed);
@@ -604,7 +604,8 @@ mod tests {
             duplicates_only: false,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let conflicts = vec![];
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].metadata.name, "skill2");
         assert!(!filtered[0].is_managed);
@@ -612,6 +613,7 @@ mod tests {
 
     #[test]
     fn test_apply_filters_duplicates() {
+        use crate::core::conflicts::{Conflict, ConflictLocation, ConflictType};
         use std::path::PathBuf;
 
         // Skill with duplicate paths (same name, different physical locations)
@@ -649,6 +651,26 @@ mod tests {
 
         let skills = vec![skill1, skill2];
 
+        // Create a conflict for duplicate-skill (it has duplicates)
+        let conflicts = vec![Conflict::new(
+            "duplicate-skill".to_string(),
+            vec![
+                ConflictLocation::new(
+                    "claude-code".to_string(),
+                    PathBuf::from("/claude/skills/duplicate-skill"),
+                    false,
+                    None,
+                ),
+                ConflictLocation::new(
+                    "windsurf".to_string(),
+                    PathBuf::from("/windsurf/skills/duplicate-skill"),
+                    false,
+                    None,
+                ),
+            ],
+            ConflictType::DuplicateUnmanaged,
+        )];
+
         // Filter by duplicates only
         let args = ListArgs {
             json_mode: false,
@@ -660,7 +682,7 @@ mod tests {
             duplicates_only: true,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].metadata.name, "duplicate-skill");
     }
@@ -705,7 +727,8 @@ mod tests {
             duplicates_only: false,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let conflicts = vec![];
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 2);
     }
 
@@ -760,9 +783,71 @@ mod tests {
             duplicates_only: false,
         };
 
-        let filtered = apply_filters(&skills, &args);
+        let conflicts = vec![];
+        let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].metadata.name, "skill2");
         assert!(filtered[0].is_managed);
+    }
+
+    #[test]
+    fn test_apply_filters_with_conflicts() {
+        use crate::core::conflicts::{Conflict, ConflictLocation, ConflictType};
+        use std::path::PathBuf;
+
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "conflict-skill".to_string(),
+                "A conflict".to_string(),
+            ),
+            "conflict-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/conflict-skill"),
+            Scope::Global,
+        ));
+
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "normal-skill".to_string(),
+                "Normal".to_string(),
+            ),
+            "normal-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/normal-skill"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // Create a conflict for conflict-skill
+        let conflicts = vec![Conflict::new(
+            "conflict-skill".to_string(),
+            vec![ConflictLocation::new(
+                "claude-code".to_string(),
+                PathBuf::from("/claude/conflict-skill"),
+                false,
+                None,
+            )],
+            ConflictType::DuplicateUnmanaged,
+        )];
+
+        // Filter by conflicts only
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: true,
+            duplicates_only: false,
+        };
+
+        let filtered = apply_filters(&skills, &args, &conflicts);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "conflict-skill");
     }
 }
