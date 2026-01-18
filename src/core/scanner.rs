@@ -1621,7 +1621,7 @@ description: A managed skill
     #[test]
     fn test_scan_all_agents_with_workspace_path() {
         let temp_base = TempDir::new().unwrap();
-        let temp_path = temp_base.into_path(); // Prevent auto-drop while we're in it
+        let temp_path = temp_base.path().to_path_buf();
 
         // Create mock workspace directory
         let workspace_dir = temp_path.join(".claude").join("skills");
@@ -1657,7 +1657,7 @@ description: A workspace-local skill
         let scanner = Scanner::new(config);
         let result = scanner.scan_all_agents();
 
-        // Restore original directory
+        // Restore original directory before temp_base is dropped
         env::set_current_dir(original_dir).unwrap();
 
         // Should find the workspace skill
@@ -1667,6 +1667,8 @@ description: A workspace-local skill
         // Verify it's a workspace installation
         let skill = &result.skills["workspace-skill"];
         assert_eq!(skill.installations[0].scope, Scope::Workspace);
+
+        // temp_base will be cleaned up when it goes out of scope
     }
 
     #[test]
