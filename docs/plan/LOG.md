@@ -179,3 +179,7 @@ Format:
 ### M2-E02-T05 — claude-opus-4-5-20251101 — done
 - **Completed**: 2026-01-18T21:36:12Z
 - **Notes**: Implemented integration tests for list command covering: empty list, list with skills, --agent filter, --managed/--unmanaged filters, --json output, snapshot test, and directory name differs from metadata name
+
+### M2-E03-T01 — claude — done
+- **Completed**: 2026-01-18T21:42:10Z
+- **Notes**: Implement Show Logic - create src/commands/show.rs with execute_show function that finds skill by name across all installations, aggregates installations, and returns SkillNotFound error if not found
