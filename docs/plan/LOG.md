@@ -92,3 +92,8 @@ Format:
 - **Started**: 2026-01-18T22:15:00Z
 - **Ended**: 2026-01-18T23:00:00Z
 - **Notes**: Created src/utils/symlink.rs with symlink utilities: create_symlink(), is_symlink(), read_symlink_target(), resolve_realpath(), and is_managed_symlink(). All functions properly handle errors using SikilError. 17 comprehensive unit tests covering symlink creation, detection, reading, resolution, and managed/unmanaged classification. All 111 tests pass.
+
+### M1-E05-T03 — claude — done
+- **Started**: 2026-01-18T23:15:00Z
+- **Ended**: 2026-01-18T23:30:00Z
+- **Notes**: Created src/utils/atomic.rs with atomic file operations: copy_skill_dir() (rejects symlinks, excludes .git, with rollback), atomic_move_dir() (atomic rename with copy+remove fallback), and safe_remove_dir() (with confirmation check). 11 comprehensive unit tests covering basic copy, git exclusion, symlink rejection, rollback, atomic moves, and safe removal. All 123 tests pass.
