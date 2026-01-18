@@ -208,6 +208,10 @@ Format:
 - **Completed**: 2026-01-18T21:50:47Z
 - **Notes**: Implement validation logic with ValidationResult, ValidationCheck, and execute_validate function. Added tests for all validation checks.
 
+### M2-E04-T02 — claude — done (bundled with M2-E04-T01)
+- **Completed**: 2026-01-18T21:50:47Z
+- **Notes**: Validation output was implemented as part of M2-E04-T01. All subtasks covered: (S01) checklist display with ✓/✗ via print_human_readable(); (S02) warnings for missing optional fields; (S03) detected directories info (scripts/, references/); (S04) PASSED/FAILED status display; (S05) exit code 0 on pass, non-zero on fail.
+
 ### M2-E04-T03 — claude — done
 - **Completed**: 2026-01-18T21:54:11Z
 - **Notes**: Wire Validate command to CLI - added support for resolving skill names via scanner, updated ValidateArgs to accept path_or_name string, and wired the command in main.rs
