@@ -1,9 +1,11 @@
-Implement the next single eligible task.
+Implement the next eligible task (exactly ONE task this session).
 
-Read first:
-1. AGENTS.md - workflow
-2. docs/plan/STATE.yaml - current progress
-3. specs/implementation_roadmap.md - task subtasks
+Select the task by reading:
+- docs/plan/STATE.yaml (what's done / current focus)
+- specs/implementation_roadmap.md (eligibility + subtasks)
 
-Complete ALL items in the "Complete" checklist before ending.
+Rules:
+- Eligible = not done AND all [DEP: ...] are done; STOP if none eligible.
+- When finished: run ./scripts/verify.sh, then ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>".
+- If anything is unclear, follow AGENTS.md (already loaded in context).
 

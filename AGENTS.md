@@ -34,17 +34,14 @@
 ### 3. Complete (ALL steps required)
 
 ```
-□ Run: cargo test
-□ Run: cargo clippy -- -D warnings  
-□ Run: cargo fmt --check
-□ Update STATE.yaml:
-    items:
-      "<TASK_ID>": { status: done, at: "<timestamp>" }
-    focus: { current_task: null, by: null }
-□ Update PLAN.md Quick View table
-□ Append entry to LOG.md
-□ Git commit (include STATE.yaml, LOG.md, PLAN.md in same commit)
+□ Run: ./scripts/verify.sh
+□ Run: ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
+□ Git commit (include STATE.yaml, LOG.md in same commit)
 ```
+
+**Scripts:**
+- `scripts/verify.sh` — Runs cargo test + clippy + fmt in one call
+- `scripts/complete-task.sh` — Atomically updates STATE.yaml + LOG.md
 
 ### Commit Message Format
 
