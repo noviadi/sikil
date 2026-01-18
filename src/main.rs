@@ -1,5 +1,8 @@
 use clap::Parser;
 use sikil::cli::Cli;
+use sikil::commands::{execute_list, ListArgs};
+use sikil::core::config::Config;
+use sikil::utils::paths::get_config_path;
 
 fn main() {
     let cli = Cli::parse();
@@ -10,10 +13,28 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Load config
+    let config_path = get_config_path();
+    let mut config = match Config::load(&config_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error loading config: {}", e);
+            std::process::exit(1);
+        }
+    };
+    config.expand_paths();
+
     // Dispatch to command handlers
     match cli.command {
         sikil::cli::Commands::List => {
-            println!("List command - not yet implemented");
+            let args = ListArgs {
+                json_mode: cli.json,
+                no_cache: cli.no_cache,
+            };
+            if let Err(e) = execute_list(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
         }
         sikil::cli::Commands::Show { name } => {
             println!("Show command for: {}", name);

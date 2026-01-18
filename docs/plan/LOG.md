@@ -151,3 +151,8 @@ Format:
 - **Started**: 2026-01-18T20:50:11Z
 - **Ended**: 2026-01-18T20:50:11Z
 - **Notes**: Integrate cache with scanner - added cache checking before filesystem walk, cache update after scan, --no-cache CLI flag, and integration/performance tests
+
+### M2-E02-T01 — claude-opus-4-5-20251101 — done
+- **Started**: 2026-01-18T20:58:19Z
+- **Ended**: 2026-01-18T20:58:19Z
+- **Notes**: Implemented list command with scanner integration, managed/unmanaged grouping, JSON/human output formats, directory name display when different from metadata name. All 7 new tests pass. Note: Pre-existing flaky test in scanner module (test_scan_all_agents_with_workspace_path) occasionally fails due to test isolation issues with parallel test execution and env::set_current_dir.
