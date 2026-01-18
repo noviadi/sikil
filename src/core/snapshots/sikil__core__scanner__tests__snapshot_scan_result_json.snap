@@ -1,0 +1,29 @@
+---
+source: src/core/scanner.rs
+expression: redacted
+---
+{
+  "skills": {
+    "test-skill": {
+      "metadata": {
+        "name": "test-skill",
+        "description": "A test skill for snapshot testing",
+        "version": "0.1.0",
+        "author": "Test Author"
+      },
+      "directory_name": "test-skill",
+      "installations": [
+        {
+          "agent": "claude-code",
+          "path": "[SKILLS_DIR]/test-skill",
+          "scope": "global",
+          "is_symlink": false,
+          "symlink_target": ""
+        }
+      ],
+      "is_managed": false
+    }
+  },
+  "entries_found": 1,
+  "parse_errors": []
+}

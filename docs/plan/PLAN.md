@@ -5,7 +5,7 @@ Quick View
 | Milestone | Status | Tasks Done | Total Tasks |
 |-----------|--------|------------|-------------|
 | M1: Foundation | Complete | 21/21 | 21 |
-| M2: Discovery | In Progress (3/19) | 3/19 | 19 |
+| M2: Discovery | In Progress (4/19) | 4/19 | 19 |
 | M3: Management | Not Started | 0/19 | 19 |
 | M4: Sync & Config | Not Started | 0/10 | 10 |
 | M5: Polish | Not Started | 0/13 | 13 |
@@ -47,14 +47,14 @@ Quick View
 ### M1-E07: Caching System (1/1 done) - COMPLETE
 - [x] M1-E07-T01: Cache Storage & API `[DEP: M1-E03-T02]`
 
-## M2: Discovery (3/19 done) - IN PROGRESS
+## M2: Discovery (4/19 done) - IN PROGRESS
 
-### M2-E01: Directory Scanner (3/5 done) - IN PROGRESS
+### M2-E01: Directory Scanner (4/5 done) - IN PROGRESS
 - [x] M2-E01-T01: Implement Scanner Core `[DEP: M1-E04-T02, M1-E03-T02]`
 - [x] M2-E01-T02: Implement Multi-Agent Scanning `[DEP: M2-E01-T01]`
 - [x] M2-E01-T03: Managed/Unmanaged Classification `[DEP: M2-E01-T02]`
-- [~] M2-E01-T04: Test Scanner `[DEP: M2-E01-T03]` ← IN PROGRESS
-- [ ] M2-E01-T05: Integrate Cache with Scanner `[DEP: M2-E01-T01, M1-E07-T01]`
+- [x] M2-E01-T04: Test Scanner `[DEP: M2-E01-T03]`
+- [ ] M2-E01-T05: Integrate Cache with Scanner `[DEP: M2-E01-T01, M1-E07-T01]` ← NEXT
 
 ### M2-E02: List Command (0/5 done) - NOT STARTED
 - [ ] M2-E02-T01: Implement List Logic `[DEP: M2-E01-T03]`
@@ -82,6 +82,5 @@ Quick View
 
 ## Next Eligible Tasks
 
-**Current Focus: M2-E01-T04** - Test Scanner `[DEP: M2-E01-T03]`
-   - All dependencies satisfied (M2-E01-T03 is done)
-   - Currently implementing...
+**Next Task: M2-E01-T05** - Integrate Cache with Scanner `[DEP: M2-E01-T01, M1-E07-T01]`
+   - All dependencies satisfied (M2-E01-T01 and M1-E07-T01 are done)

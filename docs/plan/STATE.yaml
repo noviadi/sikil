@@ -1,12 +1,12 @@
 schema_version: 3
-updated_at: "2026-01-19T02:30:00Z"
+updated_at: "2026-01-19T03:00:00Z"
 
 roadmap: "specs/implementation_roadmap.md"
 
 # Current focus (who's working on what)
 focus:
-  current_task: "M2-E01-T04"
-  by: "claude"
+  current_task: null
+  by: null
 
 # Task statuses (only non-todo items)
 # Evidence for all tasks: git log --grep="<TASK_ID>"
@@ -35,3 +35,4 @@ items:
   "M2-E01-T01": { status: done, at: "2026-01-19T01:30:00Z" }
   "M2-E01-T02": { status: done, at: "2026-01-19T02:00:00Z" }
   "M2-E01-T03": { status: done, at: "2026-01-19T02:30:00Z" }
+  "M2-E01-T04": { status: done, at: "2026-01-19T03:00:00Z" }

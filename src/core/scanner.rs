@@ -11,12 +11,13 @@ use crate::core::skill::{Agent, Installation, Scope, Skill, SkillMetadata};
 use crate::utils::paths::get_repo_path;
 use crate::utils::symlink::{read_symlink_target, resolve_realpath};
 use fs_err as fs;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
 
 /// Classification of a skill installation
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum InstallationType {
     /// Managed skill: symlink pointing to ~/.sikil/repo/
     Managed,
@@ -89,7 +90,7 @@ pub fn classify_installation(path: &Path) -> InstallationType {
 }
 
 /// A single skill entry found during scanning
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SkillEntry {
     /// Metadata parsed from SKILL.md
     pub metadata: SkillMetadata,
@@ -144,7 +145,7 @@ impl SkillEntry {
 }
 
 /// Result of a multi-agent scan operation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ScanResult {
     /// All discovered skills, keyed by skill name
     pub skills: HashMap<String, Skill>,
@@ -1519,5 +1520,51 @@ description: A workspace-local skill
 
         let result = classify_installation(&link);
         assert_eq!(result, InstallationType::ForeignSymlink);
+    }
+
+    #[test]
+    fn test_snapshot_scan_result_json() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a skills directory
+        let skills_dir = temp_dir.path().join("skills");
+        fs::create_dir(&skills_dir).unwrap();
+
+        // Create a skill directory
+        let skill_dir = skills_dir.join("test-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: test-skill
+description: A test skill for snapshot testing
+version: "0.1.0"
+author: Test Author
+---"#,
+        )
+        .unwrap();
+
+        // Create config and scan
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                skills_dir.clone(),
+                PathBuf::from(".skills"),
+            ),
+        );
+
+        let scanner = Scanner::new(config);
+        let result = scanner.scan_all_agents();
+
+        // Serialize to JSON
+        let json = serde_json::to_string_pretty(&result).unwrap();
+
+        // Redact the dynamic temp path before snapshotting
+        let skills_dir_str = skills_dir.to_string_lossy();
+        let redacted = json.replace(&*skills_dir_str, "[SKILLS_DIR]");
+
+        insta::assert_snapshot!(redacted);
     }
 }
