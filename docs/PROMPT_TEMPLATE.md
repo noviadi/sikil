@@ -13,10 +13,9 @@ Rules:
 - Eligible = not done AND all [DEP: ...] are done.
 - If no eligible task, respond "No eligible tasks" and STOP.
 - If any step fails, STOP and fix before proceeding.
-- When finished:
-  1. ./scripts/verify.sh (must pass before continuing)
-  2. ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
-  3. git add -A && git commit (include implementation + STATE.yaml + LOG.md)
+- When finished, run:
+  ./scripts/finish-task.sh "<TASK_ID>" "<agent>" "<description>" \
+    --subtask "S01:<evidence>" --subtask "S02:<evidence>" ...
 - Final response MUST include the commit hash.
 ```
 
@@ -33,9 +32,8 @@ Rules:
 - If any step fails, STOP and fix before proceeding.
 
 Finish by running:
-1. ./scripts/verify.sh (must pass before continuing)
-2. ./scripts/complete-task.sh "<TASK_ID>" "<agent>" "<notes>"
-3. git add -A && git commit (include implementation + STATE.yaml + LOG.md)
+./scripts/finish-task.sh "<TASK_ID>" "<agent>" "<description>" \
+  --subtask "S01:<evidence>" --subtask "S02:<evidence>" ...
 
 Final response MUST include the commit hash.
 ```
@@ -47,9 +45,8 @@ Review the latest completed task.
 
 Verify:
 1. All subtasks match "Verifiable By" in roadmap
-2. ./scripts/verify.sh passed (test + clippy + fmt)
-3. Git commit has verification block
-4. STATE.yaml + LOG.md updated (via ./scripts/complete-task.sh)
+2. Commit message has correct format (TASK_ID: description + Verification + Subtasks)
+3. STATE.yaml + LOG.md updated
 
 Report any issues.
 ```
@@ -62,5 +59,7 @@ Report any issues.
 | State | `docs/plan/STATE.yaml` |
 | Log | `docs/plan/LOG.md` |
 | Tasks | `specs/implementation_roadmap.md` |
+| Finish | `scripts/finish-task.sh` |
 | Verify | `scripts/verify.sh` |
 | Complete | `scripts/complete-task.sh` |
+| Validate | `scripts/validate-commit-msg.sh` |
