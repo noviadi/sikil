@@ -4,13 +4,13 @@ Quick View
 
 | Milestone | Status | Tasks Done | Total Tasks |
 |-----------|--------|------------|-------------|
-| M1: Foundation | In Progress | 16/21 | 21 |
+| M1: Foundation | In Progress | 17/21 | 21 |
 | M2: Discovery | Not Started | 0/19 | 19 |
 | M3: Management | Not Started | 0/19 | 19 |
 | M4: Sync & Config | Not Started | 0/10 | 10 |
 | M5: Polish | Not Started | 0/13 | 13 |
 
-## M1: Foundation (16/21 done)
+## M1: Foundation (17/21 done)
 
 ### M1-E01: Project Setup (3/3 done) - COMPLETE
 - [x] M1-E01-T01: Initialize Rust Project
@@ -39,8 +39,8 @@ Quick View
 - [x] M1-E05-T03: Atomic File Operations
 - [x] M1-E05-T04: Test Filesystem Utilities
 
-### M1-E06: CLI Framework (0/3 todo)
-- [ ] M1-E06-T01: Setup Clap Structure `[DEP: M1-E01-T02]`
+### M1-E06: CLI Framework (1/3 done)
+- [x] M1-E06-T01: Setup Clap Structure `[DEP: M1-E01-T02]`
 - [ ] M1-E06-T02: Output Formatting `[DEP: M1-E06-T01]`
 - [ ] M1-E06-T03: Test CLI Framework `[DEP: M1-E06-T02]`
 
@@ -49,5 +49,5 @@ Quick View
 
 ## Next Eligible Tasks
 
-1. **M1-E06-T01** - Setup Clap Structure `[DEP: M1-E01-T02]`
-   - All dependencies satisfied (M1-E01-T02 is done)
+1. **M1-E06-T02** - Output Formatting `[DEP: M1-E06-T01]`
+   - All dependencies satisfied (M1-E06-T01 is now done)

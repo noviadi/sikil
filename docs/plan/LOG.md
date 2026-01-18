@@ -102,3 +102,8 @@ Format:
 - **Started**: 2026-01-18T23:30:00Z
 - **Ended**: 2026-01-18T23:45:00Z
 - **Notes**: Created integration tests for filesystem utilities in tests/filesystem_utils_test.rs. All 7 subtasks covered: symlink creation/reading, symlink to non-existent target detection, atomic copy with temp directory, atomic move preserves content, permission error handling, copy_skill_dir rejects symlinks, and .git directory exclusion. All 169 tests pass (123 unit + 9 integration + 9 common + 13 parser + 15 doc).
+
+### M1-E06-T01 — claude-opus-4-5 — done
+- **Started**: 2026-01-18T23:45:00Z
+- **Ended**: 2026-01-19T00:00:00Z
+- **Notes**: Created src/cli/app.rs with complete CLI structure using clap derive. Implemented Cli struct with global flags (--json, --verbose, --quiet). Defined Commands enum with all 10 subcommands (list, show, install, validate, adopt, unmanage, remove, sync, config, completions) as stubs. Added --version flag showing 0.1.0. Wired up main.rs to use CLI parser with command dispatch. Added usage examples to all commands using #[command(after_help)]. Verified --help, --version, and list --help output correctly. All 169 tests pass.
