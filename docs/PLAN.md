@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E03-T01, M1-E03-T02 |
+| **Next candidates** | M1-E03-T02, M1-E03-T03 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03, M1-E03-T01 |
 
 ---
 
@@ -166,10 +166,36 @@ items:
         - "S05: Error variants added: AlreadyExists, PermissionDenied, ValidationError"
         - "S06: Security error variants added: PathTraversal, SymlinkNotAllowed, InvalidGitUrl, ConfigTooLarge"
         - "S07: 14 unit tests written and passing (test_error_display_invalid_skill_md, test_error_display_skill_not_found, test_error_display_directory_not_found, test_error_display_symlink_error, test_error_display_git_error, test_error_display_config_error, test_error_display_already_exists, test_error_display_permission_denied, test_error_display_validation_error, test_error_display_path_traversal, test_error_display_symlink_not_allowed, test_error_display_invalid_git_url, test_error_display_config_too_large, test_error_debug_format)"
+  "M1-E03-T01":
+    title: "Define Config Model"
+    status: "done"
+    started_at: "2026-01-18T09:00:00Z"
+    done_at: "2026-01-18T09:10:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T09:10:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: src/core/config.rs created"
+        - "S02: AgentConfig struct defined with enabled, global_path, workspace_path fields, compiles"
+        - "S03: Config struct defined with HashMap<String, AgentConfig>, compiles"
+        - "S04: Default trait implemented with hardcoded paths for all 5 agents (claude-code, windsurf, opencode, kilocode, amp), unit test passes"
+        - "S05: 7 unit tests written and passing (test_agent_config_new, test_config_new, test_config_insert_and_get_agent, test_config_default_has_all_agents, test_config_default_all_agents_enabled, test_config_default_agent_paths, test_config_serialization)"
 
 # Session log (append-only)
 sessions:
-  - started_at: "2026-01-17T09:10:00Z"
+   - started_at: "2026-01-18T09:00:00Z"
+    ended_at: "2026-01-18T09:10:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E03-T01"
+        outcome: "done"
+    notes: "Implemented Config model with AgentConfig struct and Default trait for all 5 agents. Created 7 unit tests for config creation, retrieval, defaults, and serialization. All tests passing."
+   - started_at: "2026-01-17T09:10:00Z"
     ended_at: "2026-01-17T09:30:00Z"
     by: "amp-agent"
     worked_on:
