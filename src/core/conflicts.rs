@@ -283,6 +283,92 @@ pub fn filter_error_conflicts(conflicts: &[Conflict]) -> Vec<&Conflict> {
         .collect()
 }
 
+/// Formats a conflict for human-readable display
+///
+/// # Arguments
+///
+/// * `conflict` - The conflict to format
+///
+/// # Returns
+///
+/// A formatted string with conflict details
+pub fn format_conflict(conflict: &Conflict) -> String {
+    let mut result = String::new();
+
+    // Conflict header with skill name
+    let status_indicator = if conflict.conflict_type.is_error() {
+        "✗"
+    } else {
+        "ℹ"
+    };
+    result.push_str(&format!(
+        "{} {} ({})\n",
+        status_indicator,
+        conflict.skill_name,
+        conflict.conflict_type_description()
+    ));
+
+    // Description
+    result.push_str(&format!("  {}\n", conflict.conflict_type.description()));
+
+    // Locations
+    result.push_str("  Locations:\n");
+    for (i, location) in conflict.locations.iter().enumerate() {
+        let managed_status = if location.is_managed {
+            "managed"
+        } else {
+            "unmanaged"
+        };
+        result.push_str(&format!(
+            "    {}. {} ({}) @ {}\n",
+            i + 1,
+            location.agent,
+            managed_status,
+            location.path.display()
+        ));
+        if let Some(ref repo) = location.repo_path {
+            result.push_str(&format!("       → repo: {}\n", repo.display()));
+        }
+    }
+
+    result
+}
+
+/// Formats conflicts as a summary with counts
+///
+/// # Arguments
+///
+/// * `conflicts` - The conflicts to summarize
+///
+/// # Returns
+///
+/// A formatted summary string
+pub fn format_conflicts_summary(conflicts: &[Conflict]) -> String {
+    let error_count = conflicts
+        .iter()
+        .filter(|c| c.conflict_type.is_error())
+        .count();
+    let info_count = conflicts.len() - error_count;
+
+    let mut parts = Vec::new();
+    if error_count > 0 {
+        parts.push(format!(
+            "{} error{}",
+            error_count,
+            if error_count == 1 { "" } else { "s" }
+        ));
+    }
+    if info_count > 0 {
+        parts.push(format!("{} info", info_count));
+    }
+
+    if parts.is_empty() {
+        "No conflicts detected".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -709,5 +795,128 @@ mod tests {
         let conflicts = detect_conflicts(&scan_result);
         // Single managed installation should not create a conflict
         assert_eq!(conflicts.len(), 0);
+    }
+
+    #[test]
+    fn test_format_conflict_unmanaged() {
+        let locations = vec![
+            ConflictLocation::new(
+                "claude-code".to_string(),
+                PathBuf::from("/claude/skills/test"),
+                false,
+                None,
+            ),
+            ConflictLocation::new(
+                "windsurf".to_string(),
+                PathBuf::from("/windsurf/skills/test"),
+                false,
+                None,
+            ),
+        ];
+
+        let conflict = Conflict::new(
+            "test-skill".to_string(),
+            locations,
+            ConflictType::DuplicateUnmanaged,
+        );
+        let formatted = format_conflict(&conflict);
+
+        assert!(formatted.contains("test-skill"));
+        assert!(formatted.contains("duplicate unmanaged"));
+        assert!(formatted.contains("claude-code"));
+        assert!(formatted.contains("windsurf"));
+        assert!(formatted.contains("unmanaged"));
+        assert!(formatted.contains("✗")); // Error indicator
+    }
+
+    #[test]
+    fn test_format_conflict_managed() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_path = temp_dir.path().join("repo").join("managed");
+        fs::create_dir_all(&repo_path).unwrap();
+
+        let locations = vec![
+            ConflictLocation::new(
+                "claude-code".to_string(),
+                PathBuf::from("/claude/skills/managed"),
+                true,
+                Some(repo_path.clone()),
+            ),
+            ConflictLocation::new(
+                "windsurf".to_string(),
+                PathBuf::from("/windsurf/skills/managed"),
+                true,
+                Some(repo_path),
+            ),
+        ];
+
+        let conflict = Conflict::new(
+            "managed-skill".to_string(),
+            locations,
+            ConflictType::DuplicateManaged,
+        );
+        let formatted = format_conflict(&conflict);
+
+        assert!(formatted.contains("managed-skill"));
+        assert!(formatted.contains("duplicate managed"));
+        assert!(formatted.contains("managed"));
+        assert!(formatted.contains("repo:")); // Shows repo path
+        assert!(formatted.contains("ℹ")); // Info indicator (not error)
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_empty() {
+        let conflicts: Vec<Conflict> = vec![];
+        let summary = format_conflicts_summary(&conflicts);
+        assert_eq!(summary, "No conflicts detected");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_errors_only() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts);
+        assert_eq!(summary, "2 errors");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_info_only() {
+        let conflicts = vec![
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info3".to_string(), vec![], ConflictType::DuplicateManaged),
+        ];
+        let summary = format_conflicts_summary(&conflicts);
+        assert_eq!(summary, "3 info");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_mixed() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts);
+        assert!(summary.contains("2 errors"));
+        assert!(summary.contains("1 info"));
     }
 }
