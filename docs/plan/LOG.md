@@ -116,3 +116,8 @@ Format:
 - **Started**: 2026-01-19T00:00:00Z
 - **Ended**: 2026-01-19T00:30:00Z
 - **Notes**: Created src/cli/output.rs with Output struct for consistent CLI formatting. Implemented print_success (green), print_warning (yellow), print_error (red), print_json, and print_info methods. Added NO_COLOR environment variable support. Messages go to stderr in JSON mode. Implemented Progress helper with indicatif that automatically disables on non-TTY/JSON mode. Added indicatif and atty dependencies to Cargo.toml. Updated cli/mod.rs to export output module. All 135 unit tests pass, clippy clean, fmt clean.
+
+### M1-E06-T03 — claude-agent — done
+- **Started**: 2026-01-19T00:30:00Z
+- **Ended**: 2026-01-19T01:00:00Z
+- **Notes**: Created tests/cli_framework_test.rs with comprehensive CLI framework tests. Implemented all 6 subtasks: (S01) test --help output verifies usage, commands, options, flags; (S02) test --version output verifies version display; (S03) test unknown command error validates error handling; (S04) test --json flag parsing confirms global flag acceptance; (S05) test --json emits valid JSON ensures clean JSON output; (S06) test all command --help includes Examples section validates documentation. Added 23 integration tests covering help output, version flags, unknown commands, global flags (--json, --verbose, --quiet with short/long variants), mutually exclusive flags, and all 10 subcommands' help examples. All 69 tests pass (23 CLI framework + 9 common + 9 filesystem + 13 parser + 15 doc), clippy clean, fmt clean.
