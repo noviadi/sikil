@@ -17,7 +17,7 @@ fn integration_test_skill_dir_creation() {
     let temp_dir = setup_temp_skill_dir();
     let skill_path = create_skill_dir(temp_dir.path(), "my-skill");
     assert!(skill_path.exists());
-    assert!(skill_path.join("SKILL.md").exists() == false); // No SKILL.md yet
+    assert!(!skill_path.join("SKILL.md").exists()); // No SKILL.md yet
 }
 
 #[test]

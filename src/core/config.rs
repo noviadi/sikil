@@ -220,7 +220,7 @@ mod tests {
     fn test_config_default_all_agents_enabled() {
         let config = Config::default();
 
-        for (_, agent_config) in &config.agents {
+        for agent_config in config.agents.values() {
             assert!(
                 agent_config.enabled,
                 "All agents should be enabled by default"

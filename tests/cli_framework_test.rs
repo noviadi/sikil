@@ -2,15 +2,14 @@
 //!
 //! These tests validate the CLI structure, flags, and help output.
 
-use assert_cmd::Command;
-use predicates::str::contains;
+mod common;
 
-const COMMAND_NAME: &str = "sikil";
+use predicates::str::contains;
 
 #[test]
 fn test_cli_help_output() {
     // M1-E06-T03-S01: Test --help output
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--help")
         .assert()
@@ -31,7 +30,7 @@ fn test_cli_help_output() {
 #[test]
 fn test_cli_version_output() {
     // M1-E06-T03-S02: Test --version output
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--version")
         .assert()
@@ -43,7 +42,7 @@ fn test_cli_version_output() {
 #[test]
 fn test_cli_version_short_flag() {
     // Also test -V short flag for version
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("-V")
         .assert()
@@ -55,7 +54,7 @@ fn test_cli_version_short_flag() {
 #[test]
 fn test_unknown_command_error() {
     // M1-E06-T03-S03: Test unknown command error
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("nonexistent-command")
         .assert()
@@ -67,7 +66,7 @@ fn test_unknown_command_error() {
 #[test]
 fn test_json_flag_parsing() {
     // M1-E06-T03-S04: Test --json flag parsing
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     // Test that --json is accepted as a global flag
     cmd.arg("--json").arg("list").assert().success(); // Will fail later with "not yet implemented" but flag parses
@@ -76,7 +75,7 @@ fn test_json_flag_parsing() {
 #[test]
 fn test_verbose_flag_parsing() {
     // Test --verbose flag parsing
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--verbose").arg("list").assert().success();
 }
@@ -84,7 +83,7 @@ fn test_verbose_flag_parsing() {
 #[test]
 fn test_verbose_short_flag_parsing() {
     // Test -v short flag for verbose
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("-v").arg("list").assert().success();
 }
@@ -92,7 +91,7 @@ fn test_verbose_short_flag_parsing() {
 #[test]
 fn test_quiet_flag_parsing() {
     // Test --quiet flag parsing
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--quiet").arg("list").assert().success();
 }
@@ -100,7 +99,7 @@ fn test_quiet_flag_parsing() {
 #[test]
 fn test_quiet_short_flag_parsing() {
     // Test -q short flag for quiet
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("-q").arg("list").assert().success();
 }
@@ -108,7 +107,7 @@ fn test_quiet_short_flag_parsing() {
 #[test]
 fn test_quiet_and_verbose_mutually_exclusive() {
     // Test that --quiet and --verbose are mutually exclusive
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--quiet")
         .arg("--verbose")
@@ -121,7 +120,7 @@ fn test_quiet_and_verbose_mutually_exclusive() {
 #[test]
 fn test_json_flag_with_list_command() {
     // M1-E06-T03-S05: Test --json emits valid JSON on stdout with no non-JSON noise
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     // The list command will output "List command - not yet implemented"
     // but we're testing that the JSON flag is properly parsed and handled
@@ -132,7 +131,7 @@ fn test_json_flag_with_list_command() {
 #[test]
 fn test_list_command_help_includes_examples() {
     // M1-E06-T03-S06: Test sikil <cmd> --help includes Examples section
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("list")
         .arg("--help")
@@ -148,7 +147,7 @@ fn test_list_command_help_includes_examples() {
 #[test]
 fn test_show_command_help_includes_examples() {
     // Test show command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("show")
         .arg("--help")
@@ -162,7 +161,7 @@ fn test_show_command_help_includes_examples() {
 #[test]
 fn test_install_command_help_includes_examples() {
     // Test install command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("install")
         .arg("--help")
@@ -178,7 +177,7 @@ fn test_install_command_help_includes_examples() {
 #[test]
 fn test_validate_command_help_includes_examples() {
     // Test validate command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg("--help")
@@ -192,7 +191,7 @@ fn test_validate_command_help_includes_examples() {
 #[test]
 fn test_adopt_command_help_includes_examples() {
     // Test adopt command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("adopt")
         .arg("--help")
@@ -206,7 +205,7 @@ fn test_adopt_command_help_includes_examples() {
 #[test]
 fn test_unmanage_command_help_includes_examples() {
     // Test unmanage command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("unmanage")
         .arg("--help")
@@ -221,7 +220,7 @@ fn test_unmanage_command_help_includes_examples() {
 #[test]
 fn test_remove_command_help_includes_examples() {
     // Test remove command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("remove")
         .arg("--help")
@@ -236,7 +235,7 @@ fn test_remove_command_help_includes_examples() {
 #[test]
 fn test_sync_command_help_includes_examples() {
     // Test sync command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("sync")
         .arg("--help")
@@ -251,7 +250,7 @@ fn test_sync_command_help_includes_examples() {
 #[test]
 fn test_completions_command_help_includes_examples() {
     // Test completions command help includes examples
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("completions")
         .arg("--help")
@@ -268,7 +267,7 @@ fn test_completions_command_help_includes_examples() {
 #[test]
 fn test_all_subcommands_available() {
     // Test that all defined subcommands are available
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--help")
         .assert()
@@ -288,7 +287,7 @@ fn test_all_subcommands_available() {
 #[test]
 fn test_global_flags_documented() {
     // Test that global flags are documented in help
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("--help")
         .assert()
@@ -301,7 +300,7 @@ fn test_global_flags_documented() {
 #[test]
 fn test_no_args_requires_subcommand() {
     // Test that running with no args requires a subcommand (clap behavior)
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     // When no subcommand is provided, clap should exit with error code 2
     // and display help text on stderr

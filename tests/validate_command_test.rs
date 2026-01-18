@@ -7,12 +7,11 @@
 //! - Error handling for missing required fields (exit non-zero)
 //! - Snapshot testing for validation output
 
-use assert_cmd::Command;
+mod common;
+
 use predicates::str::contains;
 use std::fs;
 use tempfile::TempDir;
-
-const COMMAND_NAME: &str = "sikil";
 
 /// Helper to create a valid skill directory with SKILL.md
 fn create_valid_skill(base_dir: &std::path::Path, skill_name: &str) -> std::path::PathBuf {
@@ -135,7 +134,7 @@ fn test_validate_valid_skill() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_valid_skill(temp_dir.path(), "valid-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -157,7 +156,7 @@ fn test_validate_valid_skill_by_path() {
     let skill_dir = create_valid_skill(temp_dir.path(), "path-skill");
     let skill_md = skill_dir.join("SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(skill_md)
@@ -172,7 +171,7 @@ fn test_validate_missing_skill_md() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_without_md(temp_dir.path(), "no-md-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -190,7 +189,7 @@ fn test_validate_invalid_name_starts_with_hyphen() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_with_invalid_name(temp_dir.path(), "-invalid-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -220,7 +219,7 @@ description: "A skill with invalid name"
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -251,7 +250,7 @@ description: "A skill with a very long name"
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -268,7 +267,7 @@ fn test_validate_missing_required_field_name() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_missing_field(temp_dir.path(), "no-name", "name");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -286,7 +285,7 @@ fn test_validate_missing_required_field_description() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_missing_field(temp_dir.path(), "no-desc", "description");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -315,7 +314,7 @@ description: "A test skill"
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -340,7 +339,7 @@ This is a test skill without frontmatter.
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -371,7 +370,7 @@ description: "{}"
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -399,7 +398,7 @@ description: ""
 
     fs::write(skill_dir.join("SKILL.md"), content).expect("Failed to write SKILL.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -416,7 +415,7 @@ fn test_validate_with_warnings() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_minimal_skill(temp_dir.path(), "minimal-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -450,7 +449,7 @@ fn test_validate_with_directories() {
     fs::write(refs_dir.join("doc.md"), "# Reference documentation")
         .expect("Failed to write doc.md");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     cmd.arg("validate")
         .arg(&skill_dir)
@@ -468,7 +467,7 @@ fn test_validate_json_output_valid_skill() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_valid_skill(temp_dir.path(), "json-valid-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     let output = cmd
         .arg("validate")
@@ -507,7 +506,7 @@ fn test_validate_json_output_invalid_skill() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_without_md(temp_dir.path(), "json-invalid-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     let output = cmd
         .arg("validate")
@@ -544,7 +543,7 @@ fn test_validate_snapshot_output() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_valid_skill(temp_dir.path(), "snapshot-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     let skill_dir_str = skill_dir.display().to_string();
     let output = cmd
@@ -585,7 +584,7 @@ fn test_validate_snapshot_output_with_warnings() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_minimal_skill(temp_dir.path(), "snapshot-warn-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     let output = cmd
         .arg("validate")
@@ -611,7 +610,7 @@ fn test_validate_snapshot_output_failure() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let skill_dir = create_skill_without_md(temp_dir.path(), "snapshot-fail-skill");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
 
     let output = cmd
         .arg("validate")
