@@ -1,6 +1,8 @@
 use clap::Parser;
 use sikil::cli::Cli;
-use sikil::commands::{execute_list, execute_show, ListArgs, ShowArgs};
+use sikil::commands::{
+    execute_list, execute_show, execute_validate, ListArgs, ShowArgs, ValidateArgs,
+};
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
 use sikil::utils::paths::get_config_path;
@@ -86,7 +88,14 @@ fn main() {
             }
         }
         sikil::cli::Commands::Validate { path } => {
-            println!("Validate command for: {:?}", path);
+            let args = ValidateArgs {
+                json_mode: cli.json,
+                path_or_name: path,
+            };
+            if let Err(e) = execute_validate(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
         }
         sikil::cli::Commands::Adopt { name, from } => {
             println!("Adopt command for: {:?}", name);

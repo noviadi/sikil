@@ -4,8 +4,10 @@
 //! by checking their SKILL.md files and directory structure.
 
 use crate::cli::output::Output;
+use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::{extract_frontmatter, parse_skill_md, validate_skill_name};
+use crate::core::scanner::Scanner;
 use anyhow::Result;
 use fs_err as fs;
 use std::path::{Path, PathBuf};
@@ -15,8 +17,8 @@ use std::path::{Path, PathBuf};
 pub struct ValidateArgs {
     /// Whether to output in JSON format
     pub json_mode: bool,
-    /// Path to the skill directory or SKILL.md file to validate
-    pub path: PathBuf,
+    /// Path to the skill directory, SKILL.md file, or name of an installed skill
+    pub path_or_name: String,
 }
 
 /// Result of validating a skill
@@ -60,39 +62,43 @@ pub struct DetectedDirectories {
 /// Executes the validate command
 ///
 /// This function:
-/// 1. Checks if SKILL.md exists
-/// 2. Checks if YAML frontmatter is valid
-/// 3. Checks if required fields are present
-/// 4. Checks name format constraints
-/// 5. Checks description length (1-1024)
+/// 1. Resolves the input (path or installed skill name)
+/// 2. Checks if SKILL.md exists
+/// 3. Checks if YAML frontmatter is valid
+/// 4. Checks if required fields are present
+/// 5. Checks name format constraints
+/// 6. Checks description length (1-1024)
 ///
 /// # Arguments
 ///
-/// * `args` - Validate arguments including path and json_mode
+/// * `args` - Validate arguments including path_or_name and json_mode
+/// * `config` - Configuration for resolving installed skills
 ///
 /// # Errors
 ///
 /// Returns an error if:
 /// - The path does not exist
 /// - The path is not a directory or SKILL.md file
+/// - The skill name is not found among installed skills
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use sikil::commands::validate::{execute_validate, ValidateArgs};
-/// use std::path::PathBuf;
+/// use sikil::core::config::Config;
 ///
+/// let config = Config::default();
 /// let args = ValidateArgs {
 ///     json_mode: false,
-///     path: PathBuf::from("/path/to/skill"),
+///     path_or_name: "/path/to/skill".to_string(),
 /// };
-/// execute_validate(args).unwrap();
+/// execute_validate(args, &config).unwrap();
 /// ```
-pub fn execute_validate(args: ValidateArgs) -> Result<()> {
+pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
     let output = Output::new(args.json_mode);
 
     // Determine the skill directory and SKILL.md path
-    let (skill_dir, skill_md_path) = resolve_paths(&args.path)?;
+    let (skill_dir, skill_md_path) = resolve_paths(&args.path_or_name, config)?;
 
     // Run all validations
     let mut checks: Vec<ValidationCheck> = Vec::new();
@@ -231,15 +237,52 @@ pub fn execute_validate(args: ValidateArgs) -> Result<()> {
     }
 }
 
-/// Resolves the skill directory and SKILL.md path from the input path
-fn resolve_paths(path: &Path) -> Result<(PathBuf, PathBuf)> {
-    if !path.exists() {
-        return Err(SikilError::DirectoryNotFound {
-            path: path.to_path_buf(),
-        }
-        .into());
+/// Resolves the skill directory and SKILL.md path from the input
+///
+/// This function handles:
+/// 1. Direct paths to skill directories
+/// 2. Direct paths to SKILL.md files
+/// 3. Installed skill names (looks up via scanner)
+fn resolve_paths(path_or_name: &str, config: &Config) -> Result<(PathBuf, PathBuf)> {
+    let path = PathBuf::from(path_or_name);
+
+    // First, check if it's an existing path
+    if path.exists() {
+        return resolve_path_direct(&path);
     }
 
+    // If the path doesn't exist, treat it as a skill name and try to find it
+    let skill_name = path_or_name;
+
+    // Use scanner to find the skill
+    let scanner = Scanner::new(config.clone());
+    let scan_result = scanner.scan_all_agents();
+
+    // Look for the skill by name
+    if let Some(skill) = scan_result.skills.get(skill_name) {
+        // Use the first installation path
+        if let Some(first_installation) = skill.installations.first() {
+            let skill_dir = first_installation.path.clone();
+            let skill_md = skill_dir.join("SKILL.md");
+            return Ok((skill_dir, skill_md));
+        }
+
+        // If managed but no installations, use repo path
+        if let Some(ref repo_path) = skill.repo_path {
+            let skill_md = repo_path.join("SKILL.md");
+            return Ok((repo_path.clone(), skill_md));
+        }
+    }
+
+    // Skill not found
+    Err(SikilError::SkillNotFound {
+        name: skill_name.to_string(),
+    }
+    .into())
+}
+
+/// Resolves a direct path to a skill directory or SKILL.md file
+fn resolve_path_direct(path: &Path) -> Result<(PathBuf, PathBuf)> {
     if path.is_file() {
         // If it's a file, it should be SKILL.md
         if path.file_name() == Some(std::ffi::OsStr::new("SKILL.md")) {
@@ -427,30 +470,30 @@ This is a test skill."#;
     }
 
     #[test]
-    fn test_resolve_paths_with_directory() {
+    fn test_resolve_path_direct_with_directory() {
         let temp_dir = TempDir::new().unwrap();
         let skill_dir = temp_dir.path();
 
-        let (resolved_dir, skill_md) = resolve_paths(skill_dir).unwrap();
+        let (resolved_dir, skill_md) = resolve_path_direct(skill_dir).unwrap();
         assert_eq!(resolved_dir, skill_dir);
         assert_eq!(skill_md, skill_dir.join("SKILL.md"));
     }
 
     #[test]
-    fn test_resolve_paths_with_skill_md_file() {
+    fn test_resolve_path_direct_with_skill_md_file() {
         let temp_dir = TempDir::new().unwrap();
         let skill_dir = temp_dir.path();
         create_valid_skill_md(skill_dir);
 
         let skill_md_path = skill_dir.join("SKILL.md");
-        let (resolved_dir, resolved_md) = resolve_paths(&skill_md_path).unwrap();
+        let (resolved_dir, resolved_md) = resolve_path_direct(&skill_md_path).unwrap();
         assert_eq!(resolved_dir, skill_dir);
         assert_eq!(resolved_md, skill_md_path);
     }
 
     #[test]
-    fn test_resolve_paths_with_nonexistent_path() {
-        let result = resolve_paths(Path::new("/nonexistent/path"));
+    fn test_resolve_path_direct_with_nonexistent_path() {
+        let result = resolve_path_direct(Path::new("/nonexistent/path"));
         assert!(result.is_err());
     }
 
@@ -609,5 +652,38 @@ description: No frontmatter markers"#;
         let json = serde_json::to_string(&dirs).unwrap();
         assert!(json.contains("\"has_scripts\":false"));
         assert!(json.contains("\"has_references\":true"));
+    }
+
+    #[test]
+    fn test_resolve_paths_with_skill_name() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a skill directory
+        let skill_dir = temp_dir.path().join("test-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        create_valid_skill_md(&skill_dir);
+
+        // Create a config that points to our temp directory
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                temp_dir.path().to_path_buf(),
+                PathBuf::from(".skills"),
+            ),
+        );
+
+        // Resolve using skill name
+        let (resolved_dir, skill_md) = resolve_paths("test-skill", &config).unwrap();
+        assert_eq!(resolved_dir, skill_dir);
+        assert_eq!(skill_md, skill_dir.join("SKILL.md"));
+    }
+
+    #[test]
+    fn test_resolve_paths_with_nonexistent_skill_name() {
+        let config = Config::default();
+        let result = resolve_paths("nonexistent-skill", &config);
+        assert!(result.is_err());
     }
 }
