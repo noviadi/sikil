@@ -223,3 +223,7 @@ Format:
 ### M2-E05-T02 — claude-opus-4-5-20251101 — done
 - **Completed**: 2026-01-18T22:18:15Z
 - **Notes**: Implement conflict output formatting and integration with list command
+
+### M2-E05-T03 — ralph — done
+- **Completed**: 2026-01-18T22:46:49Z
+- **Notes**: implement integration tests for conflict detection
