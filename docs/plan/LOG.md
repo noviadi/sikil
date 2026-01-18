@@ -82,3 +82,8 @@ Format:
 - **Started**: 2026-01-18T20:30:00Z
 - **Ended**: 2026-01-18T21:00:00Z
 - **Notes**: Created integration tests for parser with fixtures. 4 valid SKILL.md fixtures, 6 invalid fixtures. 10 integration tests for parsing valid/invalid skills. 3 snapshot tests for JSON output. All 111 tests pass.
+
+### M1-E05-T01 — claude — done
+- **Started**: 2026-01-18T21:30:00Z
+- **Ended**: 2026-01-18T22:00:00Z
+- **Notes**: Created src/utils/paths.rs with expand_path(), get_repo_path(), get_config_path(), and ensure_dir_exists(). Uses directories crate v5 API with UserDirs. All 8 unit tests passing (tilde expansion, env vars, relative/absolute paths, repo/config paths, directory creation).
