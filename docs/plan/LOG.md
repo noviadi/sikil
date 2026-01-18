@@ -187,3 +187,7 @@ Format:
 ### M2-E03-T02 — claude — done
 - **Completed**: 2026-01-18T21:43:25Z
 - **Notes**: Task M2-E03-T02 was already fully implemented in the show.rs file. All subtasks verified: metadata display, managed/unmanaged status, canonical path, installations list, file tree, total size, and JSON output.
+
+### M2-E03-T03 — claude — done
+- **Completed**: 2026-01-18T21:44:48Z
+- **Notes**: Wired Show command to CLI - added import for execute_show and ShowArgs in main.rs, replaced stub implementation with actual execute_show call using global flags (json, no_cache) and name from CLI args

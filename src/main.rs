@@ -1,6 +1,6 @@
 use clap::Parser;
 use sikil::cli::Cli;
-use sikil::commands::{execute_list, ListArgs};
+use sikil::commands::{execute_list, execute_show, ListArgs, ShowArgs};
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
 use sikil::utils::paths::get_config_path;
@@ -69,7 +69,15 @@ fn main() {
             }
         }
         sikil::cli::Commands::Show { name } => {
-            println!("Show command for: {}", name);
+            let args = ShowArgs {
+                json_mode: cli.json,
+                no_cache: cli.no_cache,
+                name,
+            };
+            if let Err(e) = execute_show(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
         }
         sikil::cli::Commands::Install { source, r#to } => {
             println!("Install command from: {:?}", source);
