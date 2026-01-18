@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(retrieved.size, 1024);
         assert_eq!(retrieved.content_hash, "abc123");
         assert_eq!(retrieved.skill_name, Some("test-skill".to_string()));
-        assert_eq!(retrieved.is_valid_skill, true);
+        assert!(retrieved.is_valid_skill);
     }
 
     #[test]
@@ -618,7 +618,7 @@ mod tests {
         assert_eq!(retrieved.size, 2048);
         assert_eq!(retrieved.content_hash, "hash2");
         assert_eq!(retrieved.skill_name, Some("skill-v2".to_string()));
-        assert_eq!(retrieved.is_valid_skill, false);
+        assert!(!retrieved.is_valid_skill);
     }
 
     #[test]
@@ -642,7 +642,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(retrieved.skill_name, None);
-        assert_eq!(retrieved.is_valid_skill, false);
+        assert!(!retrieved.is_valid_skill);
     }
 
     #[test]

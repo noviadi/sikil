@@ -7,6 +7,27 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
+/// Creates an `assert_cmd::Command` for the sikil binary.
+///
+/// This macro uses `cargo_bin_cmd!` which is the recommended approach as of
+/// `assert_cmd` 2.1.0+. It reads the `CARGO_BIN_EXE_sikil` environment variable
+/// set by Cargo during `cargo test`, making it compatible with custom build
+/// directories (`build.build-dir` config in Cargo 1.84+).
+///
+/// # Example
+/// ```ignore
+/// use crate::common::sikil_cmd;
+///
+/// let mut cmd = sikil_cmd!();
+/// cmd.arg("--help").assert().success();
+/// ```
+#[macro_export]
+macro_rules! sikil_cmd {
+    () => {
+        assert_cmd::cargo::cargo_bin_cmd!("sikil")
+    };
+}
+
 /// Creates a temporary directory for test skill storage.
 ///
 /// Returns a `TempDir` which will be automatically cleaned up when dropped.

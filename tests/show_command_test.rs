@@ -6,12 +6,11 @@
 //! - JSON output
 //! - Snapshot testing
 
-use assert_cmd::Command;
+mod common;
+
 use predicates::str::contains;
 use std::fs;
 use tempfile::TempDir;
-
-const COMMAND_NAME: &str = "sikil";
 
 /// Helper to create a skill directory with SKILL.md
 fn create_skill(base_dir: &std::path::Path, skill_name: &str, skill_title: &str, skill_desc: &str) {
@@ -102,7 +101,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     cmd.arg("show")
@@ -142,7 +141,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     cmd.arg("show")
@@ -184,7 +183,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     let output = cmd
@@ -240,7 +239,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     cmd.arg("show")
@@ -297,7 +296,7 @@ workspace_path = ".claude/skills"
 
     #[cfg(unix)]
     {
-        let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+        let mut cmd = sikil_cmd!();
         cmd.env("HOME", temp_dir.path());
 
         cmd.arg("show")
@@ -341,7 +340,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     let output = cmd
@@ -411,7 +410,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     let output = cmd
@@ -472,7 +471,7 @@ workspace_path = ".claude/skills"
 
     fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 
-    let mut cmd = Command::cargo_bin(COMMAND_NAME).unwrap();
+    let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
     let output = cmd
