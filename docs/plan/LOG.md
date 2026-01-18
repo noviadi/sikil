@@ -191,3 +191,15 @@ Format:
 ### M2-E03-T03 — claude — done
 - **Completed**: 2026-01-18T21:44:48Z
 - **Notes**: Wired Show command to CLI - added import for execute_show and ShowArgs in main.rs, replaced stub implementation with actual execute_show call using global flags (json, no_cache) and name from CLI args
+
+### M2-E03-T04 — claude — done
+- **Completed**: 2026-01-18T21:47:17Z
+- **Notes**: Implemented integration tests for show command including:
+- Test showing existing skill
+- Test showing non-existent skill with error handling
+- Test JSON output validation
+- Test snapshot output
+- Test showing skills with file structure
+- Test showing managed skills
+- Test showing minimal skills (required fields only)
+- Test JSON output for minimal skills
