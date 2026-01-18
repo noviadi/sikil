@@ -183,3 +183,7 @@ Format:
 ### M2-E03-T01 — claude — done
 - **Completed**: 2026-01-18T21:42:10Z
 - **Notes**: Implement Show Logic - create src/commands/show.rs with execute_show function that finds skill by name across all installations, aggregates installations, and returns SkillNotFound error if not found
+
+### M2-E03-T02 — claude — done
+- **Completed**: 2026-01-18T21:43:25Z
+- **Notes**: Task M2-E03-T02 was already fully implemented in the show.rs file. All subtasks verified: metadata display, managed/unmanaged status, canonical path, installations list, file tree, total size, and JSON output.
