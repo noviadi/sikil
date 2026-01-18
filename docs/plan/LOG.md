@@ -211,3 +211,7 @@ Format:
 ### M2-E04-T03 — claude — done
 - **Completed**: 2026-01-18T21:54:11Z
 - **Notes**: Wire Validate command to CLI - added support for resolving skill names via scanner, updated ValidateArgs to accept path_or_name string, and wired the command in main.rs
+
+### M2-E04-T04 — claude — done
+- **Completed**: 2026-01-18T21:57:47Z
+- **Notes**: Implemented integration tests for validate command including tests for valid skills, missing SKILL.md, invalid names, missing required fields, and snapshot tests for validation output
