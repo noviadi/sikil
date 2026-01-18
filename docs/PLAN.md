@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E04-T02 |
+| **Next candidates** | M1-E04-T03 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E04-T01, M1-E03-T03, M1-E03-T02, M1-E03-T01, M1-E02-T03, M1-E02-T02, M1-E02-T01, M1-E01-T03, M1-E01-T02, M1-E01-T01 |
+| **Recently completed** | M1-E04-T02, M1-E04-T01, M1-E03-T03, M1-E03-T02, M1-E03-T01, M1-E02-T03, M1-E02-T02, M1-E02-T01, M1-E01-T03, M1-E01-T02, M1-E01-T01 |
 
 ---
 
@@ -254,9 +254,35 @@ items:
         - "S03: Missing frontmatter (no --- markers) returns InvalidSkillMd error with descriptive reason"
         - "S04: Malformed frontmatter (single ---) returns InvalidSkillMd error with descriptive reason"
         - "S05: 16 unit tests written and passing (test_extract_frontmatter_valid, test_extract_frontmatter_valid_with_leading_newline, test_extract_frontmatter_valid_multiline, test_extract_frontmatter_missing_markers, test_extract_frontmatter_single_marker, test_extract_frontmatter_not_at_start, test_extract_frontmatter_empty_frontmatter, test_extract_frontmatter_with_empty_lines_in_frontmatter, test_extract_frontmatter_preserves_internal_spacing, test_extract_frontmatter_empty_content, test_extract_frontmatter_only_whitespace, test_extract_frontmatter_three_markers, test_extract_frontmatter_marker_with_spaces, test_extract_frontmatter_complex_yaml, plus 1 doc test)"
+  "M1-E04-T02":
+    title: "Metadata Parsing"
+    status: "done"
+    started_at: "2026-01-18T12:00:00Z"
+    done_at: "2026-01-18T12:15:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T12:15:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05"]
+      evidence:
+        - "S01: parse_skill_md() function implemented in src/core/parser.rs, reads file, extracts frontmatter, parses YAML into SkillMetadata"
+        - "S02: Required field 'name' parsed from YAML and validated, unit tests pass (test_parse_skill_md_valid_minimal, test_parse_skill_md_missing_name)"
+        - "S03: Required field 'description' parsed from YAML and validated, unit tests pass (test_parse_skill_md_valid_minimal, test_parse_skill_md_missing_description)"
+        - "S04: Optional fields version, author, license parsed correctly when present, unit test passes (test_parse_skill_md_valid_with_all_fields)"
+        - "S05: Returns InvalidSkillMd error when required fields missing, unit tests pass (test_parse_skill_md_missing_name, test_parse_skill_md_missing_description, test_parse_skill_md_missing_both_required_fields)"
 
 # Session log (append-only)
 sessions:
+  - started_at: "2026-01-18T12:00:00Z"
+    ended_at: "2026-01-18T12:15:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E04-T02"
+        outcome: "done"
+    notes: "Implemented Metadata Parsing for SKILL.md parser. Added parse_skill_md() function in src/core/parser.rs that reads SKILL.md file, extracts YAML frontmatter using extract_frontmatter(), parses into SkillMetadata, and validates required fields (name, description). Added RawSkillMetadata helper struct with Option fields for graceful parsing. Created 9 comprehensive unit tests covering valid minimal, valid with all fields, missing name, missing description, missing both required fields, missing file, invalid YAML, no frontmatter, and multiline description scenarios. Added parse_skill_md to core module exports. All 78 tests pass (67 lib tests + 9 integration tests + 2 doc tests)."
   - started_at: "2026-01-18T11:00:00Z"
     ended_at: "2026-01-18T11:30:00Z"
     by: "claude-code"
