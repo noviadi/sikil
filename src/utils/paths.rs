@@ -86,6 +86,28 @@ pub fn get_config_path() -> PathBuf {
     home.join(".sikil").join("config.toml")
 }
 
+/// Returns the path to the Sikil cache database.
+///
+/// The cache database is typically at `~/.sikil/cache.sqlite`.
+///
+/// # Returns
+///
+/// A `PathBuf` pointing to the cache database
+///
+/// # Examples
+///
+/// ```
+/// use sikil::utils::paths::get_cache_path;
+///
+/// let cache_path = get_cache_path();
+/// assert!(cache_path.ends_with(".sikil/cache.sqlite"));
+/// ```
+pub fn get_cache_path() -> PathBuf {
+    let user_dirs = directories::UserDirs::new().expect("Unable to determine home directory");
+    let home = user_dirs.home_dir();
+    home.join(".sikil").join("cache.sqlite")
+}
+
 /// Ensures a directory exists, creating it and any parent directories if necessary.
 ///
 /// # Arguments
@@ -168,6 +190,15 @@ mod tests {
         let home = user_dirs.home_dir();
         assert!(config_path.starts_with(home));
         assert!(config_path.ends_with(".sikil/config.toml"));
+    }
+
+    #[test]
+    fn test_get_cache_path() {
+        let cache_path = get_cache_path();
+        let user_dirs = directories::UserDirs::new().expect("Unable to determine home directory");
+        let home = user_dirs.home_dir();
+        assert!(cache_path.starts_with(home));
+        assert!(cache_path.ends_with(".sikil/cache.sqlite"));
     }
 
     #[test]

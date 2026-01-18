@@ -4,13 +4,13 @@ Quick View
 
 | Milestone | Status | Tasks Done | Total Tasks |
 |-----------|--------|------------|-------------|
-| M1: Foundation | In Progress | 19/21 | 21 |
+| M1: Foundation | Complete | 21/21 | 21 |
 | M2: Discovery | Not Started | 0/19 | 19 |
 | M3: Management | Not Started | 0/19 | 19 |
 | M4: Sync & Config | Not Started | 0/10 | 10 |
 | M5: Polish | Not Started | 0/13 | 13 |
 
-## M1: Foundation (19/21 done)
+## M1: Foundation (21/21 done) - COMPLETE
 
 ### M1-E01: Project Setup (3/3 done) - COMPLETE
 - [x] M1-E01-T01: Initialize Rust Project
@@ -44,10 +44,10 @@ Quick View
 - [x] M1-E06-T02: Output Formatting `[DEP: M1-E06-T01]`
 - [x] M1-E06-T03: Test CLI Framework `[DEP: M1-E06-T02]`
 
-### M1-E07: Caching System (0/1 todo)
-- [ ] M1-E07-T01: Cache Storage & API `[DEP: M1-E03-T02]`
+### M1-E07: Caching System (1/1 done) - COMPLETE
+- [x] M1-E07-T01: Cache Storage & API `[DEP: M1-E03-T02]`
 
 ## Next Eligible Tasks
 
-1. **M1-E07-T01** - Cache Storage & API `[DEP: M1-E03-T02]`
-   - All dependencies satisfied (M1-E03-T02 is done)
+1. **M2-E01-T01** - Implement Scanner Core `[DEP: M1-E04-T02, M1-E03-T02]`
+   - All dependencies satisfied (M1-E04-T02 and M1-E03-T02 are done)
