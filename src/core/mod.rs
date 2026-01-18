@@ -7,5 +7,5 @@ pub mod skill;
 
 pub use config::{AgentConfig, Config};
 pub use errors::SikilError;
-pub use parser::{extract_frontmatter, parse_skill_md};
+pub use parser::{extract_frontmatter, parse_skill_md, validate_skill_name};
 pub use skill::{Agent, Installation, Scope, Skill, SkillMetadata};

@@ -6,6 +6,7 @@
 use crate::core::errors::SikilError;
 use crate::core::skill::SkillMetadata;
 use fs_err as fs;
+use regex::Regex;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -93,6 +94,85 @@ pub fn extract_frontmatter(content: &str) -> Result<&str, SikilError> {
     }
 
     Ok(frontmatter)
+}
+
+/// Validates a skill name according to the naming rules.
+///
+/// Skill names must:
+/// - Start with a lowercase letter or digit
+/// - Contain only lowercase letters, digits, hyphens, and underscores
+/// - Be 1-64 characters long
+/// - Not contain path separators (`/`, `\`)
+/// - Not be path traversal attempts (`.`, `..`)
+/// - Not be empty
+///
+/// The regex pattern used is: `^[a-z0-9][a-z0-9_-]{0,63}$`
+///
+/// # Arguments
+///
+/// * `name` - The skill name to validate
+///
+/// # Returns
+///
+/// * `Ok(())` - If the name is valid
+/// * `Err(SikilError)` - If the name violates any validation rule
+///
+/// # Examples
+///
+/// ```
+/// use sikil::core::parser::validate_skill_name;
+/// use sikil::core::errors::SikilError;
+///
+/// assert!(validate_skill_name("my-skill").is_ok());
+/// assert!(validate_skill_name("my_skill").is_ok());
+/// assert!(validate_skill_name("0-skill").is_ok());
+/// assert!(validate_skill_name("-skill").is_err());
+/// assert!(validate_skill_name("my.skill").is_err());
+/// # Ok::<(), SikilError>(())
+/// ```
+///
+/// # Errors
+///
+/// * Returns `ValidationError` if the name is empty
+/// * Returns `ValidationError` if the name doesn't match the required pattern
+pub fn validate_skill_name(name: &str) -> Result<(), SikilError> {
+    // Check for empty name
+    if name.is_empty() {
+        return Err(SikilError::ValidationError {
+            reason: "skill name cannot be empty".to_string(),
+        });
+    }
+
+    // Check for path traversal attempts
+    if name == "." || name == ".." {
+        return Err(SikilError::PathTraversal {
+            path: name.to_string(),
+        });
+    }
+
+    // Check for path separators
+    if name.contains('/') || name.contains('\\') {
+        return Err(SikilError::ValidationError {
+            reason: format!(
+                "skill name cannot contain path separators: found '{}' in '{}'",
+                if name.contains('/') { '/' } else { '\\' },
+                name
+            ),
+        });
+    }
+
+    // Validate against the regex pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+    let re = Regex::new(r"^[a-z0-9][a-z0-9_-]{0,63}$").unwrap();
+    if !re.is_match(name) {
+        return Err(SikilError::ValidationError {
+            reason: format!(
+                "invalid skill name '{}': must start with lowercase letter or digit, contain only lowercase letters, digits, hyphens, and underscores, and be 1-64 characters",
+                name
+            ),
+        });
+    }
+
+    Ok(())
 }
 
 /// Raw YAML structure for parsing SKILL.md frontmatter
@@ -578,5 +658,162 @@ description: |
         let metadata = result.unwrap();
         assert_eq!(metadata.name, "test-skill");
         assert!(metadata.description.contains("multi-line"));
+    }
+
+    // Tests for validate_skill_name
+
+    #[test]
+    fn test_validate_skill_name_valid_lowercase_hyphen() {
+        assert!(validate_skill_name("my-skill").is_ok());
+        assert!(validate_skill_name("test-skill-name").is_ok());
+        assert!(validate_skill_name("a-b-c").is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_valid_underscore() {
+        assert!(validate_skill_name("my_skill").is_ok());
+        assert!(validate_skill_name("test_skill_name").is_ok());
+        assert!(validate_skill_name("a_b_c").is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_valid_mixed() {
+        assert!(validate_skill_name("my-skill_name").is_ok());
+        assert!(validate_skill_name("test_skill-name").is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_valid_starts_with_digit() {
+        assert!(validate_skill_name("0-skill").is_ok());
+        assert!(validate_skill_name("9_skill").is_ok());
+        assert!(validate_skill_name("123skill").is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_valid_single_char() {
+        assert!(validate_skill_name("a").is_ok());
+        assert!(validate_skill_name("z").is_ok());
+        assert!(validate_skill_name("0").is_ok());
+        assert!(validate_skill_name("9").is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_valid_max_length() {
+        // 64 characters: first char + 63 more
+        let name = "a".repeat(64);
+        assert_eq!(name.len(), 64);
+        assert!(validate_skill_name(&name).is_ok());
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_empty() {
+        let result = validate_skill_name("");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_starts_with_hyphen() {
+        let result = validate_skill_name("-skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_starts_with_underscore() {
+        let result = validate_skill_name("_skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_uppercase() {
+        let result = validate_skill_name("MySkill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_contains_dot() {
+        let result = validate_skill_name("my.skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_contains_space() {
+        let result = validate_skill_name("my skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_contains_special_chars() {
+        assert!(validate_skill_name("my@skill").is_err());
+        assert!(validate_skill_name("my#skill").is_err());
+        assert!(validate_skill_name("my$skill").is_err());
+        assert!(validate_skill_name("my%skill").is_err());
+        assert!(validate_skill_name("my&skill").is_err());
+        assert!(validate_skill_name("my*skill").is_err());
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_too_long() {
+        // 65 characters: exceeds max of 64
+        let name = "a".repeat(65);
+        assert_eq!(name.len(), 65);
+        let result = validate_skill_name(&name);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_forward_slash() {
+        let result = validate_skill_name("my/skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("path separators"));
+        assert!(err.to_string().contains("/"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_backslash() {
+        let result = validate_skill_name("my\\skill");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("path separators"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_single_dot() {
+        let result = validate_skill_name(".");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SikilError::PathTraversal { .. }));
+        assert!(err.to_string().contains("Path traversal detected"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_double_dot() {
+        let result = validate_skill_name("..");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SikilError::PathTraversal { .. }));
+        assert!(err.to_string().contains("Path traversal detected"));
+    }
+
+    #[test]
+    fn test_validate_skill_name_invalid_ends_with_dot() {
+        let result = validate_skill_name("skill.");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid skill name"));
     }
 }
