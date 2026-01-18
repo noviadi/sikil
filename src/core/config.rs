@@ -412,4 +412,68 @@ unknown_field = "this should fail"
         let global_path_str = agent.global_path.to_string_lossy();
         assert!(!global_path_str.contains('~'));
     }
+
+    #[test]
+    fn test_config_disabled_agent_is_excluded() {
+        let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        // Create config with one enabled and one disabled agent
+        let toml_content = r#"
+[agents.enabled-agent]
+enabled = true
+global_path = "/enabled/global"
+workspace_path = ".enabled/workspace"
+
+[agents.disabled-agent]
+enabled = false
+global_path = "/disabled/global"
+workspace_path = ".disabled/workspace"
+"#;
+
+        std::fs::write(temp_path, toml_content).expect("Failed to write temp file");
+
+        let result = Config::load(temp_path);
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+
+        // Both agents should be in the config
+        assert!(config.get_agent("enabled-agent").is_some());
+        assert!(config.get_agent("disabled-agent").is_some());
+
+        // But enabled should be true and false respectively
+        let enabled_agent = config.get_agent("enabled-agent").unwrap();
+        assert!(enabled_agent.enabled);
+
+        let disabled_agent = config.get_agent("disabled-agent").unwrap();
+        assert!(!disabled_agent.enabled);
+    }
+
+    #[test]
+    fn test_config_iter_enabled_agents_only() {
+        let mut config = Config::new();
+
+        // Add mix of enabled and disabled agents
+        config.insert_agent(
+            "enabled-1".to_string(),
+            AgentConfig::new(true, PathBuf::from("/e1"), PathBuf::from(".e1")),
+        );
+        config.insert_agent(
+            "disabled-1".to_string(),
+            AgentConfig::new(false, PathBuf::from("/d1"), PathBuf::from(".d1")),
+        );
+        config.insert_agent(
+            "enabled-2".to_string(),
+            AgentConfig::new(true, PathBuf::from("/e2"), PathBuf::from(".e2")),
+        );
+
+        // Count only enabled agents
+        let enabled_count = config.agents.values().filter(|a| a.enabled).count();
+        assert_eq!(enabled_count, 2);
+
+        // Count disabled agents
+        let disabled_count = config.agents.values().filter(|a| !a.enabled).count();
+        assert_eq!(disabled_count, 1);
+    }
 }

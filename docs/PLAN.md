@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E03-T03 |
+| **Next candidates** | M1-E04-T01 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03, M1-E03-T01, M1-E03-T02 |
+| **Recently completed** | M1-E03-T03, M1-E03-T02, M1-E03-T01, M1-E02-T03, M1-E02-T02, M1-E02-T01, M1-E01-T03, M1-E01-T02, M1-E01-T01 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-18T08:15:00Z"
+updated_at: "2026-01-18T10:00:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -215,9 +215,36 @@ items:
         - "S05: Config file size limit (1MB max) implemented and enforced, unit test passes (test_config_load_oversized_file_returns_error)"
         - "S06: #[serde(deny_unknown_fields)] added to AgentConfig and Config structs, unit test passes (test_config_deny_unknown_fields)"
         - "S07: Integration test with temp config file passes (all subtask tests pass)"
+  "M1-E03-T03":
+    title: "Test Config System"
+    status: "done"
+    started_at: "2026-01-18T09:55:00Z"
+    done_at: "2026-01-18T10:00:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T10:00:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05", "S06"]
+      evidence:
+        - "S01: Test loading valid TOML config - already covered by test_config_load_valid_toml"
+        - "S02: Test invalid TOML returns error - already covered by test_config_load_invalid_toml_returns_error"
+        - "S03: Test partial config merges with defaults - already covered by test_config_load_partial_merges_with_defaults"
+        - "S04: Test disabled agent is excluded - added test_config_disabled_agent_is_excluded and test_config_iter_enabled_agents_only"
+        - "S05: Test config file over size limit returns error - already covered by test_config_load_oversized_file_returns_error"
+        - "S06: Test unknown fields in config returns error - already covered by test_config_deny_unknown_fields"
 
 # Session log (append-only)
 sessions:
+  - started_at: "2026-01-18T09:55:00Z"
+    ended_at: "2026-01-18T10:00:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E03-T03"
+        outcome: "done"
+    notes: "Completed all tests for M1-E03-T03 (Test Config System). Added test_config_disabled_agent_is_excluded and test_config_iter_enabled_agents_only for M1-E03-T03-S04. All 53 tests pass (44 lib tests + 9 integration tests)."
   - started_at: "2026-01-18T09:30:00Z"
     ended_at: "2026-01-18T09:50:00Z"
     by: "claude-code"
