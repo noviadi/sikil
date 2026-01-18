@@ -215,3 +215,7 @@ Format:
 ### M2-E04-T04 — claude — done
 - **Completed**: 2026-01-18T21:57:47Z
 - **Notes**: Implemented integration tests for validate command including tests for valid skills, missing SKILL.md, invalid names, missing required fields, and snapshot tests for validation output
+
+### M2-E05-T01 — claude — done
+- **Completed**: 2026-01-18T22:01:22Z
+- **Notes**: Implemented conflict detection logic with ConflictType enum, Conflict struct, ConflictLocation struct, and detect_conflicts function. Added unit tests covering all scenarios.
