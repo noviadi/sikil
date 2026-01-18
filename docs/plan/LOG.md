@@ -107,3 +107,12 @@ Format:
 - **Started**: 2026-01-18T23:45:00Z
 - **Ended**: 2026-01-19T00:00:00Z
 - **Notes**: Created src/cli/app.rs with complete CLI structure using clap derive. Implemented Cli struct with global flags (--json, --verbose, --quiet). Defined Commands enum with all 10 subcommands (list, show, install, validate, adopt, unmanage, remove, sync, config, completions) as stubs. Added --version flag showing 0.1.0. Wired up main.rs to use CLI parser with command dispatch. Added usage examples to all commands using #[command(after_help)]. Verified --help, --version, and list --help output correctly. All 169 tests pass.
+
+---
+
+## 2026-01-19
+
+### M1-E06-T02 — claude-opus-4-5 — done
+- **Started**: 2026-01-19T00:00:00Z
+- **Ended**: 2026-01-19T00:30:00Z
+- **Notes**: Created src/cli/output.rs with Output struct for consistent CLI formatting. Implemented print_success (green), print_warning (yellow), print_error (red), print_json, and print_info methods. Added NO_COLOR environment variable support. Messages go to stderr in JSON mode. Implemented Progress helper with indicatif that automatically disables on non-TTY/JSON mode. Added indicatif and atty dependencies to Cargo.toml. Updated cli/mod.rs to export output module. All 135 unit tests pass, clippy clean, fmt clean.
