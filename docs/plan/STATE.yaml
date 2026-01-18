@@ -1,0 +1,80 @@
+schema_version: 2
+updated_at: "2026-01-18T12:15:00Z"
+
+roadmap: "specs/implementation_roadmap.md"
+
+focus:
+  current_task: null
+  current_subtask: null
+  last_update_by: "claude-code"
+
+# Claims prevent concurrent work on same task
+# Format: "TASK_ID": { by: "agent", at: "timestamp", stale_after_hours: 24 }
+claims: {}
+
+# Task status entries (only non-todo items)
+# Legacy tasks: evidence in ARCHIVE_M1.md
+# New tasks: evidence in git commit message
+items:
+  # === Legacy (pre-migration, evidence in ARCHIVE_M1.md) ===
+  "M1-E01-T01":
+    status: done
+    done_at: "2026-01-17T09:30:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E01-T01" }
+
+  "M1-E01-T02":
+    status: done
+    done_at: "2026-01-17T10:00:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E01-T02" }
+
+  "M1-E01-T03":
+    status: done
+    done_at: "2026-01-17T11:15:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E01-T03" }
+
+  "M1-E02-T01":
+    status: done
+    done_at: "2026-01-17T12:15:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E02-T01" }
+
+  "M1-E02-T02":
+    status: done
+    done_at: "2026-01-17T13:05:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E02-T02" }
+
+  "M1-E02-T03":
+    status: done
+    done_at: "2026-01-18T08:15:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E02-T03" }
+
+  "M1-E03-T01":
+    status: done
+    done_at: "2026-01-18T09:10:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E03-T01" }
+
+  "M1-E03-T02":
+    status: done
+    done_at: "2026-01-18T09:50:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E03-T02" }
+
+  "M1-E03-T03":
+    status: done
+    done_at: "2026-01-18T10:00:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E03-T03" }
+
+  "M1-E04-T01":
+    status: done
+    done_at: "2026-01-18T11:30:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E04-T01" }
+
+  "M1-E04-T02":
+    status: done
+    done_at: "2026-01-18T12:15:00Z"
+    verify: { status: passed, archive: "ARCHIVE_M1.md#M1-E04-T02" }
+
+  # === New format (evidence in git commit) ===
+  # Example:
+  # "M1-E04-T03":
+  #   status: done
+  #   done_at: "2026-01-18T13:00:00Z"
+  #   verify: { status: passed, commit: "abc1234" }
