@@ -4,7 +4,10 @@
 //! YAML frontmatter delimited by `---` markers.
 
 use crate::core::errors::SikilError;
-use std::path::PathBuf;
+use crate::core::skill::SkillMetadata;
+use fs_err as fs;
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
 
 /// Extracts YAML frontmatter from SKILL.md content.
 ///
@@ -90,6 +93,104 @@ pub fn extract_frontmatter(content: &str) -> Result<&str, SikilError> {
     }
 
     Ok(frontmatter)
+}
+
+/// Raw YAML structure for parsing SKILL.md frontmatter
+///
+/// This struct uses `Option` for all fields to allow graceful handling
+/// of missing fields, which we validate after parsing.
+#[derive(Debug, Deserialize)]
+struct RawSkillMetadata {
+    /// Primary identifier (required)
+    name: Option<String>,
+
+    /// Human-readable description (required)
+    description: Option<String>,
+
+    /// Optional version string
+    version: Option<String>,
+
+    /// Optional author
+    author: Option<String>,
+
+    /// Optional license
+    license: Option<String>,
+}
+
+/// Parses a SKILL.md file and extracts its metadata.
+///
+/// This function reads a SKILL.md file, extracts the YAML frontmatter,
+/// and parses it into a `SkillMetadata` struct.
+///
+/// # Arguments
+///
+/// * `path` - Path to the SKILL.md file
+///
+/// # Returns
+///
+/// * `Ok(SkillMetadata)` - The parsed metadata
+/// * `Err(SikilError)` - If the file cannot be read, parsed, or validated
+///
+/// # Examples
+///
+/// ```no_run
+/// use sikil::core::parser::parse_skill_md;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let metadata = parse_skill_md(Path::new("/path/to/SKILL.md"))?;
+/// println!("Skill: {}", metadata.name);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// * Returns `InvalidSkillMd` if the file cannot be read
+/// * Returns `InvalidSkillMd` if the frontmatter is malformed
+/// * Returns `InvalidSkillMd` if required fields (name, description) are missing
+pub fn parse_skill_md(path: &Path) -> Result<SkillMetadata, SikilError> {
+    // Read the file content
+    let content = fs::read_to_string(path).map_err(|e| SikilError::InvalidSkillMd {
+        path: path.to_path_buf(),
+        reason: format!("failed to read file: {}", e),
+    })?;
+
+    // Extract the YAML frontmatter
+    let frontmatter = extract_frontmatter(&content).map_err(|e| match e {
+        SikilError::InvalidSkillMd { path: _, reason } => SikilError::InvalidSkillMd {
+            path: path.to_path_buf(),
+            reason,
+        },
+        _ => e,
+    })?;
+
+    // Parse the YAML into our raw struct
+    let raw: RawSkillMetadata =
+        serde_yaml::from_str(frontmatter).map_err(|e| SikilError::InvalidSkillMd {
+            path: path.to_path_buf(),
+            reason: format!("failed to parse YAML: {}", e),
+        })?;
+
+    // Validate required fields
+    let name = raw.name.ok_or_else(|| SikilError::InvalidSkillMd {
+        path: path.to_path_buf(),
+        reason: "missing required field 'name'".to_string(),
+    })?;
+
+    let description = raw.description.ok_or_else(|| SikilError::InvalidSkillMd {
+        path: path.to_path_buf(),
+        reason: "missing required field 'description'".to_string(),
+    })?;
+
+    // Build and return the SkillMetadata
+    Ok(SkillMetadata {
+        name,
+        description,
+        version: raw.version,
+        author: raw.author,
+        license: raw.license,
+    })
 }
 
 #[cfg(test)]
@@ -307,5 +408,175 @@ tags:
         assert!(frontmatter.contains("name: complex-skill"));
         assert!(frontmatter.contains("metadata:"));
         assert!(frontmatter.contains("tags:"));
+    }
+
+    // Tests for parse_skill_md
+    use std::fs;
+
+    #[test]
+    fn test_parse_skill_md_valid_minimal() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: test-skill
+description: A test skill
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.name, "test-skill");
+        assert_eq!(metadata.description, "A test skill");
+        assert!(metadata.version.is_none());
+        assert!(metadata.author.is_none());
+        assert!(metadata.license.is_none());
+    }
+
+    #[test]
+    fn test_parse_skill_md_valid_with_all_fields() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: complete-skill
+description: A skill with all fields
+version: 1.0.0
+author: Test Author
+license: MIT
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.name, "complete-skill");
+        assert_eq!(metadata.description, "A skill with all fields");
+        assert_eq!(metadata.version, Some("1.0.0".to_string()));
+        assert_eq!(metadata.author, Some("Test Author".to_string()));
+        assert_eq!(metadata.license, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn test_parse_skill_md_missing_name() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+description: A test skill
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("missing required field 'name'"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_missing_description() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: test-skill
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("missing required field 'description'"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_missing_both_required_fields() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+version: 1.0.0
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        // Should report missing name first (checked first)
+        assert!(err.to_string().contains("missing required field 'name'"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_missing_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("nonexistent.md");
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("failed to read file"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_invalid_yaml() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: test-skill
+description: [invalid
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("failed to parse YAML"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_no_frontmatter() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"# Just Markdown
+
+No frontmatter here."#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("missing frontmatter delimiters"));
+    }
+
+    #[test]
+    fn test_parse_skill_md_multiline_description() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: test-skill
+description: |
+  This is a
+  multi-line
+  description
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.name, "test-skill");
+        assert!(metadata.description.contains("multi-line"));
     }
 }
