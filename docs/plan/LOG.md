@@ -72,3 +72,8 @@ Format:
 - **Started**: 2026-01-18T12:00:00Z
 - **Ended**: 2026-01-18T12:15:00Z
 - **Notes**: Implemented parse_skill_md() with RawSkillMetadata helper. 9 comprehensive unit tests. All 78 tests pass.
+
+### M1-E04-T03 — claude-code — done
+- **Started**: 2026-01-18T13:30:00Z
+- **Ended**: 2026-01-18T14:00:00Z
+- **Notes**: Implemented validate_skill_name() with regex ^[a-z0-9][a-z0-9_-]{0,63}$. Added 21 comprehensive unit tests covering all validation rules (empty name, starts with hyphen/underscore, uppercase, dots, path separators, path traversal, max length). All 86 tests pass.
