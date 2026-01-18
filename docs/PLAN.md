@@ -19,7 +19,7 @@
 
 | Status | Tasks |
 |--------|-------|
-| **Next** | M1-E04-T03 |
+| **Next** | M1-E05-T02 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recent** | M1-E04-T02, M1-E04-T01, M1-E03-T03 |
+| **Recent** | M1-E05-T01, M1-E04-T04, M1-E04-T03 |
