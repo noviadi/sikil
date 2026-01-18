@@ -22,10 +22,10 @@ This file is the source of truth for implementation progress and multi-session c
 
 | Status | Tasks |
 |--------|-------|
-| **Next candidates** | M1-E02-T03 |
+| **Next candidates** | M1-E03-T01, M1-E03-T02 |
 | **In progress** | — |
 | **Blocked** | — |
-| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02 |
+| **Recently completed** | M1-E01-T01, M1-E01-T02, M1-E01-T03, M1-E02-T01, M1-E02-T02, M1-E02-T03 |
 
 ---
 
@@ -35,7 +35,7 @@ This file is the source of truth for implementation progress and multi-session c
 
 ```yaml
 schema_version: 1
-updated_at: "2026-01-17T13:15:00Z"
+updated_at: "2026-01-18T08:15:00Z"
 
 roadmap:
   file: "specs/implementation_roadmap.md"
@@ -145,6 +145,27 @@ items:
         - "S03: Installation struct completed with is_symlink and symlink_target fields (base from M1-E02-T01, fields added in M1-E02-T02)"
         - "S04: Display trait implemented for Agent (agent.to_string() returns cli_name)"
         - "S05: 14 unit tests passing (12 from M1-E02-T01 + test_agent_display + test_installation_with_symlink, test_installation_new updated)"
+  "M1-E02-T03":
+    title: "Define Error Types"
+    status: "done"
+    started_at: "2026-01-18T08:00:00Z"
+    done_at: "2026-01-18T08:15:00Z"
+    verification:
+      status: "passed"
+      at: "2026-01-18T08:15:00Z"
+      commands:
+        - "cargo test"
+        - "cargo clippy -- -D warnings"
+        - "cargo fmt --check"
+      subtasks: ["S01", "S02", "S03", "S04", "S05", "S06", "S07"]
+      evidence:
+        - "S01: src/core/error.rs created with SikilError enum"
+        - "S02: SikilError enum defined with #[derive(Error, Debug)] using thiserror"
+        - "S03: Error variants added: InvalidSkillMd, SkillNotFound, DirectoryNotFound"
+        - "S04: Error variants added: SymlinkError, GitError, ConfigError"
+        - "S05: Error variants added: AlreadyExists, PermissionDenied, ValidationError"
+        - "S06: Security error variants added: PathTraversal, SymlinkNotAllowed, InvalidGitUrl, ConfigTooLarge"
+        - "S07: 14 unit tests written and passing (test_error_display_invalid_skill_md, test_error_display_skill_not_found, test_error_display_directory_not_found, test_error_display_symlink_error, test_error_display_git_error, test_error_display_config_error, test_error_display_already_exists, test_error_display_permission_denied, test_error_display_validation_error, test_error_display_path_traversal, test_error_display_symlink_not_allowed, test_error_display_invalid_git_url, test_error_display_config_too_large, test_error_debug_format)"
 
 # Session log (append-only)
 sessions:
@@ -183,6 +204,13 @@ sessions:
       - id: "M1-E02-T02"
         outcome: "done"
     notes: "Implemented Display trait for Agent enum (uses cli_name for output). Completed Installation struct with is_symlink and symlink_target fields per roadmap spec. Added test_agent_display and test_installation_with_symlink unit tests. 14 tests passing."
+  - started_at: "2026-01-18T08:00:00Z"
+    ended_at: "2026-01-18T08:15:00Z"
+    by: "claude-code"
+    worked_on:
+      - id: "M1-E02-T03"
+        outcome: "done"
+    notes: "Created src/core/error.rs with SikilError enum using thiserror. Added all 13 error variants (InvalidSkillMd, SkillNotFound, DirectoryNotFound, SymlinkError, GitError, ConfigError, AlreadyExists, PermissionDenied, ValidationError, PathTraversal, SymlinkNotAllowed, InvalidGitUrl, ConfigTooLarge). 14 unit tests passing. 28 tests total in codebase."
 ```
 
 ---
