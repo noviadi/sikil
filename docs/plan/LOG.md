@@ -167,3 +167,7 @@ Format:
 - Updated main.rs to parse and pass filter options
 - Added comprehensive unit tests for all filters
 - All 13 list command tests pass
+
+### M2-E02-T03 — claude-opus-4-5 — done
+- **Completed**: 2026-01-18T21:29:21Z
+- **Notes**: Implemented table-based output format for the list command with proper column alignment, status indicators, and color coding for managed/unmanaged skills.
