@@ -76,6 +76,11 @@ pub struct ListInstallationOutput {
 /// let args = ListArgs {
 ///     json_mode: false,
 ///     no_cache: false,
+///     agent_filter: None,
+///     managed_only: false,
+///     unmanaged_only: false,
+///     conflicts_only: false,
+///     duplicates_only: false,
 /// };
 /// let config = Config::default();
 /// execute_list(args, &config).unwrap();
@@ -177,26 +182,17 @@ fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
 
     // Apply --agent filter
     if let Some(agent) = args.agent_filter {
-        filtered = filtered
-            .into_iter()
-            .filter(|skill| skill.installations.iter().any(|inst| inst.agent == agent))
-            .collect();
+        filtered.retain(|skill| skill.installations.iter().any(|inst| inst.agent == agent));
     }
 
     // Apply --managed filter
     if args.managed_only {
-        filtered = filtered
-            .into_iter()
-            .filter(|skill| skill.is_managed)
-            .collect();
+        filtered.retain(|skill| skill.is_managed);
     }
 
     // Apply --unmanaged filter
     if args.unmanaged_only {
-        filtered = filtered
-            .into_iter()
-            .filter(|skill| !skill.is_managed)
-            .collect();
+        filtered.retain(|skill| !skill.is_managed);
     }
 
     // Apply --conflicts filter (skills with both managed and unmanaged installations)
@@ -215,18 +211,15 @@ fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
             path_counts.insert(skill.metadata.name.clone(), paths);
         }
 
-        filtered = filtered
-            .into_iter()
-            .filter(|skill| {
-                // A conflict exists when the same skill name appears at multiple paths
-                // or when a skill is marked as managed but also has unmanaged installations
-                let paths = path_counts.get(&skill.metadata.name);
-                match paths {
-                    Some(ps) if ps.len() > 1 => true,
-                    _ => skill.is_managed && skill.installations.len() > 1,
-                }
-            })
-            .collect();
+        filtered.retain(|skill| {
+            // A conflict exists when the same skill name appears at multiple paths
+            // or when a skill is marked as managed but also has unmanaged installations
+            let paths = path_counts.get(&skill.metadata.name);
+            match paths {
+                Some(ps) if ps.len() > 1 => true,
+                _ => skill.is_managed && skill.installations.len() > 1,
+            }
+        });
     }
 
     // Apply --duplicates filter (skills with the same name at multiple paths)
@@ -242,13 +235,10 @@ fn apply_filters<'a>(skills: &'a [Skill], args: &ListArgs) -> Vec<&'a Skill> {
             path_counts.insert(skill.metadata.name.clone(), unique_paths.len());
         }
 
-        filtered = filtered
-            .into_iter()
-            .filter(|skill| {
-                // Duplicates exist when the same skill name appears at multiple paths
-                path_counts.get(&skill.metadata.name).copied().unwrap_or(0) > 1
-            })
-            .collect();
+        filtered.retain(|skill| {
+            // Duplicates exist when the same skill name appears at multiple paths
+            path_counts.get(&skill.metadata.name).copied().unwrap_or(0) > 1
+        });
     }
 
     filtered
