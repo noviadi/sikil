@@ -191,7 +191,7 @@ impl Agent {
             Agent::ClaudeCode => "claude-code",
             Agent::Windsurf => "windsurf",
             Agent::OpenCode => "opencode",
-            Agent::KiloCode => "kilo-code",
+            Agent::KiloCode => "kilocode",
             Agent::Amp => "amp",
         }
     }
@@ -202,7 +202,7 @@ impl Agent {
             "claude-code" => Some(Agent::ClaudeCode),
             "windsurf" => Some(Agent::Windsurf),
             "opencode" => Some(Agent::OpenCode),
-            "kilo-code" => Some(Agent::KiloCode),
+            "kilocode" => Some(Agent::KiloCode),
             "amp" => Some(Agent::Amp),
             _ => None,
         }
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(Agent::ClaudeCode.cli_name(), "claude-code");
         assert_eq!(Agent::Windsurf.cli_name(), "windsurf");
         assert_eq!(Agent::OpenCode.cli_name(), "opencode");
-        assert_eq!(Agent::KiloCode.cli_name(), "kilo-code");
+        assert_eq!(Agent::KiloCode.cli_name(), "kilocode");
         assert_eq!(Agent::Amp.cli_name(), "amp");
     }
 
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(Agent::from_cli_name("claude-code"), Some(Agent::ClaudeCode));
         assert_eq!(Agent::from_cli_name("windsurf"), Some(Agent::Windsurf));
         assert_eq!(Agent::from_cli_name("opencode"), Some(Agent::OpenCode));
-        assert_eq!(Agent::from_cli_name("kilo-code"), Some(Agent::KiloCode));
+        assert_eq!(Agent::from_cli_name("kilocode"), Some(Agent::KiloCode));
         assert_eq!(Agent::from_cli_name("amp"), Some(Agent::Amp));
         assert_eq!(Agent::from_cli_name("unknown"), None);
     }
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(Agent::ClaudeCode.to_string(), "claude-code");
         assert_eq!(Agent::Windsurf.to_string(), "windsurf");
         assert_eq!(Agent::OpenCode.to_string(), "opencode");
-        assert_eq!(Agent::KiloCode.to_string(), "kilo-code");
+        assert_eq!(Agent::KiloCode.to_string(), "kilocode");
         assert_eq!(Agent::Amp.to_string(), "amp");
     }
 }

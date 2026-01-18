@@ -185,6 +185,15 @@ items:
         - "S03: Config struct defined with HashMap<String, AgentConfig>, compiles"
         - "S04: Default trait implemented with hardcoded paths for all 5 agents (claude-code, windsurf, opencode, kilocode, amp), unit test passes"
         - "S05: 7 unit tests written and passing (test_agent_config_new, test_config_new, test_config_insert_and_get_agent, test_config_default_has_all_agents, test_config_default_all_agents_enabled, test_config_default_agent_paths, test_config_serialization)"
+    notes: |
+      FIX (2026-01-18): Corrected default agent paths to match TRD §Domain Model and official docs:
+      - Claude Code: ~/.cache/claude-code/skills → ~/.claude/skills (per https://code.claude.com/docs/en/skills)
+      - Windsurf: ~/.cache/windsurf/skills → ~/.codeium/windsurf/skills
+      - OpenCode: ~/.cache/opencode/skills → ~/.config/opencode/skill
+      - KiloCode: ~/.cache/kilocode/skills → ~/.kilocode/skills (per https://kilo.ai/docs/agent-behavior/skills)
+      - Amp: ~/.cache/amp/skills → ~/.config/agents/skills
+      Also fixed KiloCode agent name: kilo-code → kilocode (in TRD, skill.rs, config.rs)
+      Verified via web search of official agent documentation.
   "M1-E03-T02":
     title: "Config File Loading"
     status: "done"

@@ -104,53 +104,53 @@ impl Default for Config {
     fn default() -> Self {
         let mut agents = HashMap::new();
 
-        // Claude Code
+        // Claude Code - per official docs: https://code.claude.com/docs/en/skills
         agents.insert(
             "claude-code".to_string(),
             AgentConfig {
                 enabled: true,
-                global_path: PathBuf::from("~/.cache/claude-code/skills"),
+                global_path: PathBuf::from("~/.claude/skills"),
                 workspace_path: PathBuf::from(".claude/skills"),
             },
         );
 
-        // Windsurf
+        // Windsurf - per TRD §Domain Model
         agents.insert(
             "windsurf".to_string(),
             AgentConfig {
                 enabled: true,
-                global_path: PathBuf::from("~/.cache/windsurf/skills"),
+                global_path: PathBuf::from("~/.codeium/windsurf/skills"),
                 workspace_path: PathBuf::from(".windsurf/skills"),
             },
         );
 
-        // OpenCode
+        // OpenCode - per TRD §Domain Model
         agents.insert(
             "opencode".to_string(),
             AgentConfig {
                 enabled: true,
-                global_path: PathBuf::from("~/.cache/opencode/skills"),
-                workspace_path: PathBuf::from(".opencode/skills"),
+                global_path: PathBuf::from("~/.config/opencode/skill"),
+                workspace_path: PathBuf::from(".opencode/skill"),
             },
         );
 
-        // KiloCode
+        // KiloCode - per official docs: https://kilo.ai/docs/agent-behavior/skills
         agents.insert(
             "kilocode".to_string(),
             AgentConfig {
                 enabled: true,
-                global_path: PathBuf::from("~/.cache/kilocode/skills"),
+                global_path: PathBuf::from("~/.kilocode/skills"),
                 workspace_path: PathBuf::from(".kilocode/skills"),
             },
         );
 
-        // Amp
+        // Amp - per TRD §Domain Model
         agents.insert(
             "amp".to_string(),
             AgentConfig {
                 enabled: true,
-                global_path: PathBuf::from("~/.cache/amp/skills"),
-                workspace_path: PathBuf::from(".amp/skills"),
+                global_path: PathBuf::from("~/.config/agents/skills"),
+                workspace_path: PathBuf::from(".agents/skills"),
             },
         );
 
@@ -232,16 +232,20 @@ mod tests {
     fn test_config_default_agent_paths() {
         let config = Config::default();
 
+        // Claude Code - per official docs
         let claude_code = config.get_agent("claude-code").unwrap();
-        assert_eq!(
-            claude_code.global_path,
-            PathBuf::from("~/.cache/claude-code/skills")
-        );
+        assert_eq!(claude_code.global_path, PathBuf::from("~/.claude/skills"));
         assert_eq!(claude_code.workspace_path, PathBuf::from(".claude/skills"));
 
+        // KiloCode - per official docs
+        let kilocode = config.get_agent("kilocode").unwrap();
+        assert_eq!(kilocode.global_path, PathBuf::from("~/.kilocode/skills"));
+        assert_eq!(kilocode.workspace_path, PathBuf::from(".kilocode/skills"));
+
+        // Amp - per TRD
         let amp = config.get_agent("amp").unwrap();
-        assert_eq!(amp.global_path, PathBuf::from("~/.cache/amp/skills"));
-        assert_eq!(amp.workspace_path, PathBuf::from(".amp/skills"));
+        assert_eq!(amp.global_path, PathBuf::from("~/.config/agents/skills"));
+        assert_eq!(amp.workspace_path, PathBuf::from(".agents/skills"));
     }
 
     #[test]

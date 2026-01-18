@@ -177,7 +177,7 @@ impl Agent {
             Agent::ClaudeCode => "claude-code",
             Agent::Windsurf => "windsurf",
             Agent::OpenCode => "opencode",
-            Agent::KiloCode => "kilo-code",
+            Agent::KiloCode => "kilocode",
             Agent::Amp => "amp",
         }
     }
@@ -1177,8 +1177,8 @@ pub struct AgentsConfig {
     pub windsurf: Option<AgentConfig>,
     #[serde(default)]
     pub opencode: Option<AgentConfig>,
-    #[serde(default, rename = "kilo-code")]
-    pub kilo_code: Option<AgentConfig>,
+    #[serde(default)]
+    pub kilocode: Option<AgentConfig>,
     #[serde(default)]
     pub amp: Option<AgentConfig>,
 }
