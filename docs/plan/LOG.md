@@ -146,3 +146,8 @@ Format:
 - **Started**: 2026-01-19T02:30:00Z
 - **Ended**: 2026-01-19T03:00:00Z
 - **Notes**: Implemented scanner tests in src/core/scanner.rs. Added Serialize derive to InstallationType, SkillEntry, and ScanResult for JSON snapshot testing. All 7 subtasks implemented: (S01) Test fixtures exist from previous tasks; (S02) Test scanning empty directory (test_scanner_empty_directory); (S03) Test scanning directory with skills (test_scanner_with_valid_skill, test_scanner_with_multiple_skills); (S04) Test scanning with symlinks (test_scanner_with_symlink_skill); (S05) Test scanning with broken symlinks (test_classify_installation_broken_symlink); (S06) Test multi-agent scanning (test_scan_all_agents_with_mock_directories, test_scan_all_agents_with_default_config, test_scan_all_agents_aggregates_by_skill_name); (S07) Snapshot test scan result JSON (test_snapshot_scan_result_json) with path redaction for temp directories. Created snapshot file src/core/snapshots/sikil__core__scanner__tests__snapshot_scan_result_json.snap. All 250 tests pass (175 lib + 23 CLI framework + 9 common + 9 filesystem + 13 parser + 19 doc), clippy clean, fmt clean.
+
+### M2-E01-T05 — claude — done
+- **Started**: 2026-01-18T20:50:11Z
+- **Ended**: 2026-01-18T20:50:11Z
+- **Notes**: Integrate cache with scanner - added cache checking before filesystem walk, cache update after scan, --no-cache CLI flag, and integration/performance tests
