@@ -247,3 +247,7 @@ Format:
 ### M3-E01-T04 — claude-opus-4-5-20251101 — done
 - **Completed**: 2026-01-19T01:48:21Z
 - **Notes**: Wire Install Command to CLI
+
+### M3-E01-T05 — claude — done
+- **Completed**: 2026-01-19T01:52:27Z
+- **Notes**: Test Install Local
