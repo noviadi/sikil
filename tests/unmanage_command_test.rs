@@ -130,11 +130,20 @@ workspace_path = ".windsurf/skills"
     let skill2_path = agent2_dir.join(skill_name);
 
     assert!(skill1_path.exists(), "Skill should exist in agent1");
-    assert!(!skill1_path.is_symlink(), "Skill in agent1 should be physical dir");
-    assert!(skill1_path.join("SKILL.md").exists(), "SKILL.md should exist");
+    assert!(
+        !skill1_path.is_symlink(),
+        "Skill in agent1 should be physical dir"
+    );
+    assert!(
+        skill1_path.join("SKILL.md").exists(),
+        "SKILL.md should exist"
+    );
 
     assert!(skill2_path.exists(), "Skill should exist in agent2");
-    assert!(!skill2_path.is_symlink(), "Skill in agent2 should be physical dir");
+    assert!(
+        !skill2_path.is_symlink(),
+        "Skill in agent2 should be physical dir"
+    );
 
     // Verify: repo entry deleted
     assert!(
@@ -209,7 +218,10 @@ workspace_path = ".windsurf/skills"
     // Verify: agent2 (windsurf) still symlink
     let skill2_path = agent2_dir.join(skill_name);
     assert!(skill2_path.exists(), "Skill should exist in agent2");
-    assert!(skill2_path.is_symlink(), "Skill in agent2 should still be symlink");
+    assert!(
+        skill2_path.is_symlink(),
+        "Skill in agent2 should still be symlink"
+    );
 
     // Verify: repo still exists (still managed by windsurf)
     assert!(
