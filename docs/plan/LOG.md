@@ -307,3 +307,7 @@ Format:
 ### M3-E05-T04 — cascade — done
 - **Completed**: 2026-01-19T05:14:24Z
 - **Notes**: test remove command
+
+### M4-E01-T01 — cascade — done
+- **Completed**: 2026-01-19T05:30:21Z
+- **Notes**: implement sync command logic

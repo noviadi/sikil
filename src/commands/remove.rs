@@ -991,7 +991,10 @@ This is a test skill."#,
         };
 
         let result = execute_remove(args, &config);
-        assert!(result.is_ok(), "Remove with comma-separated agents should succeed");
+        assert!(
+            result.is_ok(),
+            "Remove with comma-separated agents should succeed"
+        );
 
         // Verify both symlinks were removed
         #[cfg(unix)]
@@ -1001,7 +1004,10 @@ This is a test skill."#,
         }
 
         // Verify skill is still in repo (only symlinks removed, not repo)
-        assert!(skill_repo_path.exists(), "Skill should remain in repo when using --agent");
+        assert!(
+            skill_repo_path.exists(),
+            "Skill should remain in repo when using --agent"
+        );
 
         // Cleanup
         let _ = fs::remove_dir_all(&skill_repo_path);
