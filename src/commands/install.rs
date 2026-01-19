@@ -843,7 +843,7 @@ This is a test skill."#,
         }
 
         // Cleanup
-        let _ = fs::remove_dir_all(&repo_dir.join("rollback-test-skill"));
+        let _ = fs::remove_dir_all(repo_dir.join("rollback-test-skill"));
     }
 
     // Test that successful installation leaves files in place
