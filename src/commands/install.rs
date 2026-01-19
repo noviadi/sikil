@@ -1,7 +1,7 @@
 //! Install command implementation
 //!
 //! This module provides functionality for installing skills from local paths
-//! into the Sikil repository and creating symlinks to agent directories.
+//! or Git repositories into the Sikil repository and creating symlinks to agent directories.
 
 use crate::cli::output::Output;
 use crate::cli::output::Progress;
@@ -10,6 +10,7 @@ use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
 use crate::utils::atomic::copy_skill_dir;
+use crate::utils::git::{cleanup_clone, clone_repo, extract_subdirectory, parse_git_url};
 use crate::utils::paths::{ensure_dir_exists, get_repo_path};
 use crate::utils::symlink::create_symlink;
 use anyhow::Result;
@@ -269,6 +270,302 @@ pub fn execute_install_local(args: InstallArgs, config: &Config) -> Result<()> {
         output.print_success(&format!("Successfully installed {}", skill_name));
         output.print_info(&format!("Managed at: {}", dest_path.display()));
     }
+
+    Ok(())
+}
+
+/// Executes the install command for a Git URL
+///
+/// This function:
+/// 1. Parses the Git URL (short form or HTTPS)
+/// 2. Clones the repository to a temporary directory
+/// 3. Extracts the skill from root or subdirectory
+/// 4. Validates the extracted skill (SKILL.md, no symlinks)
+/// 5. Copies to repo using `copy_skill_dir` (rejects symlinks)
+/// 6. Creates symlinks to agents
+/// 7. Cleans up temporary directory
+///
+/// # Arguments
+///
+/// * `url` - Git URL to install from (short form or HTTPS)
+/// * `agents` - Vector of agents to install to
+/// * `config` - Configuration for resolving agent paths
+/// * `json_mode` - Whether to output in JSON format
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The Git URL is invalid
+/// - Git is not installed
+/// - The clone operation fails
+/// - The subdirectory is not found
+/// - The skill validation fails
+/// - A skill with the same name already exists
+/// - The destination is a physical directory or symlink
+/// - The copy operation fails
+/// - Symlink creation fails
+///
+/// # Examples
+///
+/// ```no_run
+/// use sikil::commands::install::execute_install_git;
+/// use sikil::core::config::Config;
+///
+/// let config = Config::default();
+/// execute_install_git("owner/repo", vec![], &config, false).unwrap();
+/// ```
+pub fn execute_install_git(
+    url: &str,
+    agents: Vec<String>,
+    config: &Config,
+    json_mode: bool,
+) -> Result<()> {
+    let output = Output::new(json_mode);
+
+    // M3-E02-T04-S01: Implement execute_install_git function
+    // Parse the Git URL
+    let parsed_url = parse_git_url(url).map_err(|e| match e {
+        SikilError::InvalidGitUrl { url, reason } => SikilError::GitError {
+            reason: format!("invalid Git URL '{}': {}", url, reason),
+        },
+        _ => e,
+    })?;
+
+    if !json_mode {
+        output.print_info(&format!("Cloning repository: {}", parsed_url.clone_url));
+    }
+
+    // M3-E02-T04-S02: Clone repo to temp
+    let temp_clone_dir = tempfile::tempdir().map_err(|e| SikilError::GitError {
+        reason: format!("failed to create temporary directory: {}", e),
+    })?;
+
+    let clone_path = temp_clone_dir.path();
+
+    // Clone with progress indicator
+    let progress = Progress::new(json_mode, None);
+    if !json_mode {
+        progress.set_message("Cloning repository...");
+    }
+
+    clone_repo(&parsed_url, clone_path)?;
+
+    if !json_mode {
+        progress.finish_with_message("Repository cloned");
+    }
+
+    // M3-E02-T04-S03: Extract skill (root or subdirectory)
+    let skill_path = if let Some(subdirectory) = &parsed_url.subdirectory {
+        // Extract subdirectory
+        if !json_mode {
+            progress.set_message(&format!("Extracting subdirectory: {}...", subdirectory));
+        }
+
+        let extracted = extract_subdirectory(clone_path, subdirectory)?;
+
+        if !json_mode {
+            progress.finish_with_message(&format!("Extracted: {}", subdirectory));
+        }
+
+        extracted
+    } else {
+        // Use root of repository
+        clone_path.to_path_buf()
+    };
+
+    // M3-E02-T04-S04: Validate extracted skill (SKILL.md, no symlinks)
+    let skill_md_path = skill_path.join("SKILL.md");
+    if !skill_md_path.exists() {
+        // Clean up temp directory
+        let _ = fs::remove_dir_all(temp_clone_dir.path());
+        return Err(SikilError::InvalidSkillMd {
+            path: skill_md_path,
+            reason: "SKILL.md not found in Git repository".to_string(),
+        }
+        .into());
+    }
+
+    let metadata = parse_skill_md(&skill_md_path).map_err(|e| match e {
+        SikilError::InvalidSkillMd { path, reason } => SikilError::InvalidSkillMd {
+            path,
+            reason: format!("invalid SKILL.md: {}", reason),
+        },
+        _ => e,
+    })?;
+
+    let skill_name = &metadata.name;
+
+    // Determine target agents
+    let target_agents = if agents.is_empty() {
+        // Use all enabled agents if none specified
+        parse_agent_selection(Some("all"), config)?
+    } else {
+        // Parse the provided agents
+        parse_agent_selection(Some(&agents.join(",")), config)?
+    };
+
+    if target_agents.is_empty() {
+        let _ = fs::remove_dir_all(temp_clone_dir.path());
+        return Err(SikilError::ValidationError {
+            reason: "no agents selected for installation".to_string(),
+        }
+        .into());
+    }
+
+    // Get repo path and ensure it exists
+    let repo_path = get_repo_path();
+    ensure_dir_exists(&repo_path).map_err(|_e| SikilError::PermissionDenied {
+        operation: "create repo directory".to_string(),
+        path: repo_path.clone(),
+    })?;
+
+    let dest_path = repo_path.join(skill_name);
+
+    // Check if skill already exists in repo
+    if dest_path.exists() {
+        let _ = fs::remove_dir_all(temp_clone_dir.path());
+        if dest_path.is_symlink() {
+            return Err(SikilError::AlreadyExists {
+                resource: format!("skill '{}' (symlink found in repo)", skill_name),
+            }
+            .into());
+        } else {
+            return Err(SikilError::AlreadyExists {
+                resource: format!("skill '{}' in repository", skill_name),
+            }
+            .into());
+        }
+    }
+
+    // Check if any destination is a physical directory or symlink
+    for agent in &target_agents {
+        if let Some(agent_config) = config.get_agent(&agent.to_string()) {
+            let agent_skill_path = agent_config.global_path.join(skill_name);
+
+            if agent_skill_path.exists() {
+                let _ = fs::remove_dir_all(temp_clone_dir.path());
+                if agent_skill_path.is_symlink() {
+                    return Err(SikilError::AlreadyExists {
+                        resource: format!(
+                            "skill '{}' in {} (use `sikil sync` to update)",
+                            skill_name, agent
+                        ),
+                    }
+                    .into());
+                } else {
+                    return Err(SikilError::AlreadyExists {
+                        resource: format!(
+                            "skill '{}' at {} (use `sikil adopt` to manage it)",
+                            skill_name,
+                            agent_skill_path.display()
+                        ),
+                    }
+                    .into());
+                }
+            }
+        }
+    }
+
+    if !json_mode {
+        output.print_info(&format!("Installing skill: {}", skill_name));
+        output.print_info(&format!("Source: {}", url));
+        output.print_info(&format!("Destination: {}", dest_path.display()));
+        output.print_info(&format!(
+            "Agents: {}",
+            target_agents
+                .iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        output.print_info("");
+    }
+
+    // Clean up the clone (remove .git directory)
+    cleanup_clone(&skill_path)?;
+
+    // M3-E02-T04-S05: Copy to repo using copy_skill_dir (rejects symlinks)
+    if !json_mode {
+        progress.set_message("Copying skill to repository...");
+    }
+
+    copy_skill_dir(&skill_path, &dest_path).map_err(|e| match e {
+        SikilError::SymlinkNotAllowed { reason } => {
+            let _ = fs::remove_dir_all(temp_clone_dir.path());
+            SikilError::ValidationError {
+                reason: format!(
+                    "Git repository contains symlinks which are not allowed: {}",
+                    reason
+                ),
+            }
+        }
+        _ => {
+            let _ = fs::remove_dir_all(temp_clone_dir.path());
+            e
+        }
+    })?;
+
+    if !json_mode {
+        progress.finish_with_message("Skill copied to repository");
+    }
+
+    // M3-E02-T04-S06: Create symlinks to agents
+    let mut created_symlinks: Vec<PathBuf> = Vec::new();
+
+    for agent in &target_agents {
+        if let Some(agent_config) = config.get_agent(&agent.to_string()) {
+            let agent_skill_dir = &agent_config.global_path;
+
+            // Ensure agent directory exists
+            if let Err(e) = ensure_dir_exists(agent_skill_dir) {
+                output.print_warning(&format!(
+                    "Failed to create agent directory for {}: {}",
+                    agent, e
+                ));
+                continue;
+            }
+
+            let symlink_path = agent_skill_dir.join(skill_name);
+
+            if !json_mode {
+                progress.set_message(&format!("Creating symlink for {}...", agent));
+            }
+
+            match create_symlink(&dest_path, &symlink_path) {
+                Ok(()) => {
+                    created_symlinks.push(symlink_path.clone());
+                    if !json_mode {
+                        output.print_success(&format!(
+                            "Linked to {} at {}",
+                            agent,
+                            symlink_path.display()
+                        ));
+                    }
+                }
+                Err(e) => {
+                    // Rollback on partial failure
+                    for link in &created_symlinks {
+                        let _ = fs::remove_file(link);
+                    }
+                    let _ = fs::remove_dir_all(&dest_path);
+                    let _ = fs::remove_dir_all(temp_clone_dir.path());
+                    return Err(e.into());
+                }
+            }
+        }
+    }
+
+    if !json_mode {
+        progress.clear();
+        output.print_info("");
+        output.print_success(&format!("Successfully installed {}", skill_name));
+        output.print_info(&format!("Managed at: {}", dest_path.display()));
+    }
+
+    // M3-E02-T04-S07: Clean up temp directory
+    // The temp directory will be automatically cleaned up when temp_clone_dir
+    // goes out of scope, but we can explicitly remove it here to be safe
+    let _ = fs::remove_dir_all(temp_clone_dir.path());
 
     Ok(())
 }
