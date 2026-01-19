@@ -231,3 +231,7 @@ Format:
 ### M2-E05-T03 — ralph — done
 - **Completed**: 2026-01-18T22:46:49Z
 - **Notes**: implement integration tests for conflict detection
+
+### M3-E01-T01 — claude — done
+- **Completed**: 2026-01-19T01:32:55Z
+- **Notes**: implement install command core logic
