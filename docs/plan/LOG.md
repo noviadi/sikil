@@ -235,3 +235,7 @@ Format:
 ### M3-E01-T01 — claude — done
 - **Completed**: 2026-01-19T01:32:55Z
 - **Notes**: implement install command core logic
+
+### M3-E01-T02 — claude-opus-4-5-20251101 — done
+- **Completed**: 2026-01-19T01:42:03Z
+- **Notes**: Implement install guards (skill exists check, physical dir check, symlink check, rollback on partial failure) with comprehensive unit tests
