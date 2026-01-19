@@ -663,8 +663,11 @@ This is a test skill."#,
         let repo_dir = crate::utils::paths::get_repo_path();
         fs::create_dir_all(&repo_dir).unwrap();
 
-        // Create a skill already in repo
+        // Clean up any leftover from previous failed test runs first
         let existing_skill = repo_dir.join("existing-skill");
+        let _ = fs::remove_dir_all(&existing_skill);
+
+        // Create a skill already in repo
         fs::create_dir(&existing_skill).unwrap();
         create_test_skill(&existing_skill, "existing-skill");
 

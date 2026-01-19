@@ -241,6 +241,8 @@ pub struct Scanner {
     use_cache: bool,
     /// Optional workspace root override (for testing; uses env::current_dir() if None)
     workspace_root: Option<PathBuf>,
+    /// Optional repo root override (for testing; uses get_repo_path() if None)
+    repo_root: Option<PathBuf>,
 }
 
 impl Scanner {
@@ -251,6 +253,7 @@ impl Scanner {
             cache: SqliteCache::open().ok(),
             use_cache: true,
             workspace_root: None,
+            repo_root: None,
         }
     }
 
@@ -266,6 +269,7 @@ impl Scanner {
             cache,
             use_cache,
             workspace_root: None,
+            repo_root: None,
         }
     }
 
@@ -276,6 +280,7 @@ impl Scanner {
             cache: None,
             use_cache: false,
             workspace_root: None,
+            repo_root: None,
         }
     }
 
@@ -292,6 +297,19 @@ impl Scanner {
         self
     }
 
+    /// Sets an explicit repo root directory.
+    ///
+    /// When set, this path is used instead of `~/.sikil/repo/` to find
+    /// managed skills. This is primarily useful for testing.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The repo root directory path
+    pub fn with_repo_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.repo_root = Some(root.into());
+        self
+    }
+
     /// Returns the effective workspace root directory.
     ///
     /// If an explicit workspace root was set via `with_workspace_root()`,
@@ -300,6 +318,14 @@ impl Scanner {
         self.workspace_root
             .clone()
             .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+    }
+
+    /// Returns the effective repo root directory.
+    ///
+    /// If an explicit repo root was set via `with_repo_root()`,
+    /// returns that path. Otherwise, returns `get_repo_path()`.
+    fn repo_path(&self) -> PathBuf {
+        self.repo_root.clone().unwrap_or_else(get_repo_path)
     }
 
     /// Calculates the total size of a directory in bytes.
@@ -702,7 +728,7 @@ impl Scanner {
         }
 
         // Scan the managed skills repository
-        let repo_path = get_repo_path();
+        let repo_path = self.repo_path();
         if repo_path.exists() {
             self.scan_repo(&repo_path, &mut result);
         }
@@ -1341,8 +1367,12 @@ description: A workspace skill
 
     #[test]
     fn test_scan_all_agents_empty_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
         let config = Config::new(); // Empty config, no agents
-        let scanner = Scanner::new(config);
+        let scanner = Scanner::without_cache(config).with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Should have scanned nothing since no agents are configured
@@ -1387,6 +1417,10 @@ description: A test skill
         )
         .unwrap();
 
+        // Create an empty repo directory (isolated from real ~/.sikil/repo)
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
         // Create a config that points to our temp directories
         let mut config = Config::new();
         config.insert_agent(
@@ -1398,8 +1432,10 @@ description: A test skill
             ),
         );
 
-        // Use with_workspace_root instead of changing global current directory
-        let scanner = Scanner::new(config).with_workspace_root(temp_workspace.path());
+        // Use with_workspace_root and with_repo_root for isolation
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(temp_workspace.path())
+            .with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         assert_eq!(result.skill_count(), 1);
@@ -1408,6 +1444,10 @@ description: A test skill
 
     #[test]
     fn test_scan_all_agents_skips_nonexistent_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
         let mut config = Config::new();
         config.insert_agent(
             "claude-code".to_string(),
@@ -1418,7 +1458,7 @@ description: A test skill
             ),
         );
 
-        let scanner = Scanner::new(config);
+        let scanner = Scanner::without_cache(config).with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Should not error, just return empty results
@@ -1433,6 +1473,10 @@ description: A test skill
         // Create directory for enabled agent
         let windsurf_global = temp_base.path().join("windsurf").join("skills");
         fs::create_dir_all(&windsurf_global).unwrap();
+
+        // Create an empty repo directory (isolated from real ~/.sikil/repo)
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
 
         // Create a skill
         let skill_dir = windsurf_global.join("windsurf-skill");
@@ -1465,7 +1509,7 @@ description: A Windsurf skill
             ),
         );
 
-        let scanner = Scanner::new(config);
+        let scanner = Scanner::without_cache(config).with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Should only find the Windsurf skill
@@ -1482,6 +1526,10 @@ description: A Windsurf skill
         let windsurf_global = temp_base.path().join("windsurf").join("skills");
         fs::create_dir_all(&claude_global).unwrap();
         fs::create_dir_all(&windsurf_global).unwrap();
+
+        // Create an empty repo directory (isolated from real ~/.sikil/repo)
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
 
         // Create the same skill in both agent directories
         for base in [&claude_global, &windsurf_global] {
@@ -1515,8 +1563,8 @@ description: A skill shared across agents
             ),
         );
 
-        // Use without_cache to avoid cache pollution from other tests
-        let scanner = Scanner::without_cache(config);
+        // Use without_cache and with_repo_root for isolation
+        let scanner = Scanner::without_cache(config).with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Should have one skill with two installations
@@ -1664,6 +1712,10 @@ description: A managed skill
         let workspace_dir = temp_path.join(".claude").join("skills");
         fs::create_dir_all(&workspace_dir).unwrap();
 
+        // Create an empty repo directory (isolated from real ~/.sikil/repo)
+        let repo_dir = temp_path.join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
         // Create a workspace skill
         let skill_dir = workspace_dir.join("workspace-skill");
         fs::create_dir(&skill_dir).unwrap();
@@ -1687,8 +1739,10 @@ description: A workspace-local skill
             ),
         );
 
-        // Use with_workspace_root instead of changing global current directory
-        let scanner = Scanner::new(config).with_workspace_root(&temp_path);
+        // Use with_workspace_root and with_repo_root for isolation
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(&temp_path)
+            .with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Should find the workspace skill
@@ -1766,9 +1820,13 @@ description: A workspace-local skill
     fn test_snapshot_scan_result_json() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Create a skills directory
+        // Create a skills directory for agent
         let skills_dir = temp_dir.path().join("skills");
         fs::create_dir(&skills_dir).unwrap();
+
+        // Create an empty repo directory (isolated from real ~/.sikil/repo)
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
 
         // Create a skill directory
         let skill_dir = skills_dir.join("test-skill");
@@ -1795,7 +1853,8 @@ author: Test Author
             ),
         );
 
-        let scanner = Scanner::new(config);
+        // Use isolated repo path to avoid pollution from real ~/.sikil/repo
+        let scanner = Scanner::without_cache(config).with_repo_root(&repo_dir);
         let result = scanner.scan_all_agents();
 
         // Serialize to JSON

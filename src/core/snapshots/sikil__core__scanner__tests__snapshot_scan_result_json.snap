@@ -22,46 +22,8 @@ expression: redacted
         }
       ],
       "is_managed": false
-    },
-    "existing-skill": {
-      "metadata": {
-        "name": "existing-skill",
-        "description": "A test skill for adoption",
-        "version": "1.0.0"
-      },
-      "directory_name": "existing-skill",
-      "installations": [
-        {
-          "agent": "claude-code",
-          "path": "/home/noviadi/.sikil/repo/existing-skill",
-          "scope": "global",
-          "is_symlink": false,
-          "symlink_target": ""
-        }
-      ],
-      "is_managed": true,
-      "repo_path": "/home/noviadi/.sikil/repo/existing-skill"
-    },
-    "orphan-repo-test": {
-      "metadata": {
-        "name": "orphan-repo-test",
-        "description": "A test skill for removal",
-        "version": "1.0.0"
-      },
-      "directory_name": "orphan-repo-test",
-      "installations": [
-        {
-          "agent": "claude-code",
-          "path": "/home/noviadi/.sikil/repo/orphan-repo-test",
-          "scope": "global",
-          "is_symlink": false,
-          "symlink_target": ""
-        }
-      ],
-      "is_managed": true,
-      "repo_path": "/home/noviadi/.sikil/repo/orphan-repo-test"
     }
   },
-  "entries_found": 3,
+  "entries_found": 1,
   "parse_errors": []
 }
