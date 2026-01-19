@@ -783,8 +783,13 @@ This is a test skill."#,
         let repo_dir = get_repo_path();
         fs::create_dir_all(&repo_dir).unwrap();
 
-        let skill_name = "json-mode-confirm-test";
-        let _skill_repo_path = setup_managed_skill(&repo_dir, &agent_dir, skill_name);
+        // Use unique skill name to avoid test interference
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let skill_name = format!("json-mode-confirm-test-{}", unique_id);
+        let _skill_repo_path = setup_managed_skill(&repo_dir, &agent_dir, &skill_name);
 
         let config = create_test_config_with_paths(&agent_dir);
         let args = UnmanageArgs {
@@ -801,11 +806,12 @@ This is a test skill."#,
         );
 
         // Verify unmanage completed
-        let skill_path = agent_dir.join(skill_name);
+        let skill_path = agent_dir.join(&skill_name);
         assert!(skill_path.exists());
         assert!(!skill_path.is_symlink());
 
         // Cleanup
         let _ = fs::remove_dir_all(&skill_path);
+        let _ = fs::remove_dir_all(repo_dir.join(&skill_name));
     }
 }
