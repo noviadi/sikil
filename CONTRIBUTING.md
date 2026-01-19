@@ -339,6 +339,66 @@ Sikil follows [Semantic Versioning 2.0.0](https://semver.org/). Version numbers 
 
 **Important**: Always update both `Cargo.toml` and `src/cli/app.rs` to ensure version consistency.
 
+#### Cross-Platform Builds
+
+Sikil supports cross-compilation for multiple platforms. Use the provided build script for consistent builds across platforms.
+
+**Supported Targets**:
+- `x86_64-unknown-linux-gnu` - Linux x86_64
+- `aarch64-unknown-linux-gnu` - Linux ARM64  
+- `x86_64-apple-darwin` - macOS Intel
+- `aarch64-apple-darwin` - macOS Apple Silicon
+
+**Building for Different Platforms**:
+
+1. **Linux x86_64**:
+   ```bash
+   ./scripts/build.sh x86_64-unknown-linux-gnu
+   ```
+
+2. **Linux ARM64** (requires cross-compilation tools):
+   ```bash
+   # Install target
+   rustup target add aarch64-unknown-linux-gnu
+   
+   # Install cross-compilation linker (Ubuntu/Debian)
+   sudo apt-get install gcc-aarch64-linux-gnu
+   
+   # Build
+   ./scripts/build.sh aarch64-unknown-linux-gnu
+   ```
+
+3. **macOS Intel**:
+   ```bash
+   ./scripts/build.sh x86_64-apple-darwin
+   ```
+
+4. **macOS Apple Silicon**:
+   ```bash
+   ./scripts/build.sh aarch64-apple-darwin
+   ```
+
+**Build Requirements**:
+- Rust 1.75+ with rustup
+- Platform-specific linkers for cross-compilation
+- For macOS builds: Xcode Command Line Tools on macOS
+
+**Output Location**:
+- Host builds: `target/release/sikil`
+- Cross builds: `target/<triple>/release/sikil`
+
+**Binary Size Expectations**:
+- Release builds should be under 10MB
+- Stripped release builds are typically 3-5MB
+- Size may vary slightly between platforms
+
+**Testing Cross-Builds**:
+The build script automatically runs a smoke test (`--version`) after building. For comprehensive testing:
+```bash
+# Test the built binary
+./target/x86_64-unknown-linux-gnu/release/sikil --help
+```
+
 #### Pull Request Process
 
 1. **Update documentation** if needed
