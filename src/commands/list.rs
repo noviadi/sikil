@@ -54,6 +54,31 @@ pub struct ListInstallationOutput {
     pub scope: String,
 }
 
+/// Gets information about disabled default agents
+///
+/// Returns a list of (agent_name, global_path) tuples for default agents
+/// that are disabled in the current config.
+fn get_disabled_default_agents(config: &Config) -> Vec<(String, String)> {
+    let default_config = Config::default();
+    let mut disabled = Vec::new();
+
+    for (agent_name, default_agent) in &default_config.agents {
+        // Only check default agents
+        if let Some(current_agent) = config.get_agent(agent_name) {
+            // If this agent is disabled but is enabled by default
+            if !current_agent.enabled && default_agent.enabled {
+                disabled.push((
+                    agent_name.clone(),
+                    current_agent.global_path.to_string_lossy().to_string(),
+                ));
+            }
+        }
+    }
+
+    disabled.sort_by_key(|(name, _)| name.clone());
+    disabled
+}
+
 /// Executes the list command
 ///
 /// This function:
@@ -113,6 +138,18 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
             output.print_json(&Vec::<ListSkillOutput>::new())?;
         } else {
             output.print_info("No skills found. Install a skill with `sikil install`.");
+
+            // Check if any default agents are disabled
+            let disabled_agents = get_disabled_default_agents(config);
+            if !disabled_agents.is_empty() {
+                output.print_info("");
+                output.print_warning("Some default agents are disabled in your config:");
+                for (agent_name, path) in &disabled_agents {
+                    output.print_info(&format!("  - {} (scans {})", agent_name, path));
+                }
+                output.print_info("");
+                output.print_info("To enable an agent, run: sikil config set agents.<agent>.enabled true");
+            }
         }
         return Ok(());
     }
@@ -849,5 +886,62 @@ mod tests {
         let filtered = apply_filters(&skills, &args, &conflicts);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].metadata.name, "conflict-skill");
+    }
+
+    #[test]
+    fn test_get_disabled_default_agents_all_enabled() {
+        let config = Config::default(); // All agents enabled
+        let disabled = get_disabled_default_agents(&config);
+        assert_eq!(disabled.len(), 0);
+    }
+
+    #[test]
+    fn test_get_disabled_default_agents_one_disabled() {
+        let mut config = Config::default();
+        // Disable claude-code
+        if let Some(agent) = config.agents.get_mut("claude-code") {
+            agent.enabled = false;
+        }
+
+        let disabled = get_disabled_default_agents(&config);
+        assert_eq!(disabled.len(), 1);
+        assert_eq!(disabled[0].0, "claude-code");
+        assert!(disabled[0].1.contains(".claude"));
+    }
+
+    #[test]
+    fn test_get_disabled_default_agents_multiple_disabled() {
+        let mut config = Config::default();
+        // Disable claude-code and windsurf
+        if let Some(agent) = config.agents.get_mut("claude-code") {
+            agent.enabled = false;
+        }
+        if let Some(agent) = config.agents.get_mut("windsurf") {
+            agent.enabled = false;
+        }
+
+        let disabled = get_disabled_default_agents(&config);
+        assert_eq!(disabled.len(), 2);
+        // Check they're sorted alphabetically
+        assert_eq!(disabled[0].0, "claude-code");
+        assert_eq!(disabled[1].0, "windsurf");
+    }
+
+    #[test]
+    fn test_get_disabled_default_agents_custom_agent_ignored() {
+        let mut config = Config::default();
+        // Add a custom agent that's disabled (should not be in result)
+        config.insert_agent(
+            "custom-agent".to_string(),
+            crate::core::config::AgentConfig::new(
+                false,
+                std::path::PathBuf::from("~/custom/skills"),
+                std::path::PathBuf::from(".custom/skills"),
+            ),
+        );
+
+        let disabled = get_disabled_default_agents(&config);
+        // Custom agent should not be in the disabled list since it's not a default agent
+        assert_eq!(disabled.len(), 0);
     }
 }
