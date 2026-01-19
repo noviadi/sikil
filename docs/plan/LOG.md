@@ -327,3 +327,7 @@ Format:
 ### M4-E02-T01 — cascade — done
 - **Completed**: 2026-01-19T05:49:23Z
 - **Notes**: implement config display
+
+### M4-E02-T02 — cascade — done
+- **Completed**: 2026-01-19T05:52:19Z
+- **Notes**: implement config edit functionality
