@@ -387,3 +387,7 @@ Format:
 ### M5-E03-T03 — claude — done
 - **Completed**: 2026-01-19T06:37:18Z
 - **Notes**: Implement build scripts for release builds, testing, and installation
+
+### M5-E03-T04 — cascade — done
+- **Completed**: 2026-01-19T07:20:09Z
+- **Notes**: implement cross-platform builds documentation and test
