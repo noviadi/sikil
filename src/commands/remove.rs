@@ -314,6 +314,68 @@ pub fn execute_remove(args: RemoveArgs, config: &Config) -> Result<()> {
         .into());
     }
 
+    // M3-E05-T02-S04: After --agent removal, check if repo is orphaned and prompt
+    if is_managed && !args.all && args.agent.is_some() {
+        if let Some(repo) = &repo_path {
+            if repo.exists() {
+                // Check if any symlinks still exist for this skill
+                let scanner = Scanner::new(config.clone());
+                let scan_result = scanner.scan_all_agents();
+                let remaining_installations: Vec<_> = scan_result
+                    .all_skills()
+                    .into_iter()
+                    .filter(|s| s.metadata.name == args.name)
+                    .flat_map(|s| s.installations)
+                    .collect();
+
+                if remaining_installations.is_empty() {
+                    // Repo is orphaned - prompt to delete it
+                    if !args.json_mode {
+                        output.print_warning(&format!(
+                            "No installations remain for '{}'. The repository entry is orphaned.",
+                            args.name
+                        ));
+                        output.print_info(&format!("Repository entry: {}", repo.display()));
+                    }
+
+                    let delete_repo = if args.yes || args.json_mode {
+                        // Auto-delete in --yes or JSON mode
+                        true
+                    } else {
+                        // Prompt user
+                        prompt_confirmation("Delete orphaned repository entry?")?
+                    };
+
+                    if delete_repo {
+                        if !args.json_mode {
+                            output.print_info("Removing orphaned repository entry...");
+                        }
+
+                        if let Err(_e) = safe_remove_dir(repo, true) {
+                            return Err(SikilError::PermissionDenied {
+                                operation: "remove orphaned repository entry".to_string(),
+                                path: repo.clone(),
+                            }
+                            .into());
+                        }
+
+                        if !args.json_mode {
+                            output.print_success(&format!(
+                                "Removed orphaned repository entry for '{}'",
+                                args.name
+                            ));
+                        }
+                    } else if !args.json_mode {
+                        output.print_info(&format!(
+                            "Orphaned repository entry kept at: {}",
+                            repo.display()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     // M3-E05-T01-S05: If --all and managed, delete from repo
     if args.all && is_managed {
         if let Some(repo) = &repo_path {

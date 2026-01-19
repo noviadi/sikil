@@ -291,3 +291,11 @@ Format:
 ### M3-E04-T04 — cascade — done
 - **Completed**: 2026-01-19T04:47:18Z
 - **Notes**: test unmanage command
+
+### M3-E05-T02 — cascade — done
+- **Completed**: 2026-01-19T05:10:50Z
+- **Notes**: implement remove confirmation
+
+### M3-E05-T02 — cascade — done
+- **Completed**: 2026-01-19T05:11:02Z
+- **Notes**: implement remove confirmation
