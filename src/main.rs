@@ -1,8 +1,8 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_install_local, execute_list, execute_show, execute_validate, AdoptArgs,
-    InstallArgs, ListArgs, ShowArgs, ValidateArgs,
+    execute_adopt, execute_install_local, execute_list, execute_show, execute_unmanage,
+    execute_validate, AdoptArgs, InstallArgs, ListArgs, ShowArgs, UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -117,12 +117,15 @@ fn main() {
             }
         }
         sikil::cli::Commands::Unmanage { name, agent, yes } => {
-            println!("Unmanage command for: {:?}", name);
-            if let Some(a) = agent {
-                println!("  agent: {:?}", a);
-            }
-            if yes {
-                println!("  (skip confirmation)");
+            let args = UnmanageArgs {
+                json_mode: cli.json,
+                name,
+                agent,
+                yes,
+            };
+            if let Err(e) = execute_unmanage(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Remove {
