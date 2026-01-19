@@ -26,28 +26,53 @@ Developers using multiple AI coding agents (Claude Code, Windsurf, OpenCode, Kil
 
 ## Installation
 
-```bash
-# Via cargo (coming soon)
-cargo install sikil
+### From Crates.io (Recommended)
 
-# Or download pre-built binary
-curl -sSf https://raw.githubusercontent.com/user/sikil/main/install.sh | sh
+```bash
+cargo install sikil
 ```
+
+### From Source
+
+```bash
+git clone https://github.com/user/sikil.git
+cd sikil
+cargo install --path .
+```
+
+### Pre-built Binaries
+
+```bash
+# Download the latest release
+curl -L https://github.com/user/sikil/releases/latest/download/sikil-x86_64-unknown-linux-gnu.tar.gz | tar xz
+sudo mv sikil /usr/local/bin/
+```
+
+**Requirements**: Rust 1.75+ if building from source
 
 ## Quick Start
 
 ```bash
-# See what skills exist across all agents
+# 1. See what skills exist across all agents
 sikil list
 
-# Install a skill from GitHub to all agents
-sikil install github.com/user/skills/my-skill --to all
+# 2. Install a skill from GitHub to all agents
+sikil install user/repo --to all
 
-# Adopt an existing skill into management
+# 3. Or install from a local directory
+sikil install ./my-skill --to claude-code,windsurf
+
+# 4. Show details about a skill
+sikil show git-workflow
+
+# 5. Adopt an existing skill into management
 sikil adopt git-workflow --from claude-code
 
-# Sync a managed skill to all agents
-sikil sync git-workflow
+# 6. Sync a managed skill to all agents
+sikil sync git-workflow --to all
+
+# 7. Validate a skill before installation
+sikil validate ./my-skill
 ```
 
 ## Architecture
@@ -91,17 +116,254 @@ Agent directories contain symlinks pointing to `~/.sikil/repo/`:
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `list` | List all skills across agents |
-| `show <name>` | Show details for a specific skill |
-| `install <source>` | Install from local path or Git |
-| `adopt <name>` | Adopt unmanaged skill into management |
-| `unmanage <name>` | Convert managed to unmanaged |
-| `remove <name>` | Remove a skill from agents |
-| `sync <name>` | Sync managed skill to all agents |
-| `validate <path>` | Validate skill structure |
-| `config` | View or modify configuration |
+### `list` - List all skills
+
+```bash
+# List all skills across all agents
+sikil list
+
+# Filter by agent
+sikil list --agent claude-code
+
+# Show only managed/unmanaged skills
+sikil list --managed
+sikil list --unmanaged
+
+# Show conflicts or duplicates
+sikil list --conflicts
+sikil list --duplicates
+
+# JSON output
+sikil list --json
+```
+
+### `show` - Show skill details
+
+```bash
+# Show skill details
+sikil show git-workflow
+
+# JSON output
+sikil show git-workflow --json
+```
+
+### `install` - Install skills
+
+```bash
+# Install from GitHub (short form)
+sikil install user/repo
+
+# Install from GitHub with subdirectory
+sikil install user/repo/path/to/skill
+
+# Install from full HTTPS URL
+sikil install https://github.com/user/repo.git
+
+# Install from local directory
+sikil install ./path/to/skill
+
+# Install to specific agents
+sikil install user/repo --to claude-code,windsurf
+
+# Install to all enabled agents
+sikil install user/repo --to all
+```
+
+### `adopt` - Adopt existing skills
+
+```bash
+# Adopt a skill (requires --from if multiple locations)
+sikil adopt git-workflow
+
+# Adopt from specific agent
+sikil adopt git-workflow --from claude-code
+```
+
+### `unmanage` - Convert to unmanaged
+
+```bash
+# Unmanage from all agents
+sikil unmanage git-workflow
+
+# Unmanage from specific agent
+sikil unmanage git-workflow --agent claude-code
+
+# Skip confirmation
+sikil unmanage git-workflow --yes
+```
+
+### `remove` - Remove skills
+
+```bash
+# Remove from specific agents
+sikil remove git-workflow --agent claude-code,windsurf
+
+# Remove from all agents (managed and unmanaged)
+sikil remove git-workflow --all
+
+# Skip confirmation
+sikil remove git-workflow --all --yes
+```
+
+### `sync` - Sync skills across agents
+
+```bash
+# Sync specific skill to missing agents
+sikil sync git-workflow
+
+# Sync all managed skills
+sikil sync --all
+
+# Sync to specific agents
+sikil sync git-workflow --to claude-code,windsurf
+```
+
+### `validate` - Validate skill structure
+
+```bash
+# Validate local skill
+sikil validate ./my-skill
+
+# Validate installed skill
+sikil validate git-workflow
+
+# JSON output
+sikil validate ./my-skill --json
+```
+
+### `config` - Configuration management
+
+```bash
+# Show current configuration
+sikil config
+
+# Edit configuration file
+sikil config --edit
+
+# Set configuration values
+sikil config set agents.claude-code.global_path "/custom/path"
+sikil config set agents.windsurf.enabled false
+```
+
+### `completions` - Generate shell completions
+
+```bash
+# Generate bash completions
+sikil completions bash
+
+# Generate zsh completions
+sikil completions zsh
+
+# Generate fish completions
+sikil completions fish
+
+# Save to file
+sikil completions bash --output ~/.local/share/bash-completion/completions/sikil
+```
+
+## JSON Output Schema
+
+Several commands support structured JSON output with `--json` flag:
+
+### `sikil list --json`
+
+```json
+{
+  "skills": [
+    {
+      "name": "git-workflow",
+      "description": "Git workflow automation skill",
+      "version": "1.0.0",
+      "author": "user",
+      "installations": [
+        {
+          "agent": "claude-code",
+          "path": "/home/user/.claude/skills/git-workflow",
+          "scope": "global",
+          "is_managed": true,
+          "is_symlink": true,
+          "symlink_target": "/home/user/.sikil/repo/git-workflow"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_skills": 1,
+    "managed_skills": 1,
+    "unmanaged_skills": 0,
+    "conflicts": 0,
+    "duplicates": 0
+  }
+}
+```
+
+### `sikil show <skill> --json`
+
+```json
+{
+  "name": "git-workflow",
+  "description": "Git workflow automation skill",
+  "version": "1.0.0",
+  "author": "user",
+  "license": "MIT",
+  "is_managed": true,
+  "canonical_path": "/home/user/.sikil/repo/git-workflow",
+  "total_size": 24576,
+  "installations": [
+    {
+      "agent": "claude-code",
+      "path": "/home/user/.claude/skills/git-workflow",
+      "scope": "global",
+      "is_managed": true,
+      "is_symlink": true,
+      "symlink_target": "/home/user/.sikil/repo/git-workflow"
+    },
+    {
+      "agent": "windsurf",
+      "path": "/home/user/project/.windsurf/skills/git-workflow",
+      "scope": "workspace",
+      "is_managed": true,
+      "is_symlink": true,
+      "symlink_target": "/home/user/.sikil/repo/git-workflow"
+    }
+  ],
+  "file_tree": [
+    "SKILL.md",
+    "scripts/",
+    "scripts/setup.sh",
+    "references/",
+    "references/git-commands.md"
+  ]
+}
+```
+
+### `sikil validate <path> --json`
+
+```json
+{
+  "path": "/home/user/my-skill",
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "code": "missing_optional_field",
+      "message": "Optional field 'version' not found in frontmatter"
+    }
+  ],
+  "checks": {
+    "skill_md_exists": true,
+    "frontmatter_valid": true,
+    "required_fields_present": true,
+    "name_format_valid": true,
+    "description_length_valid": true
+  },
+  "detected_structure": {
+    "has_scripts_dir": true,
+    "has_references_dir": false,
+    "file_count": 5
+  }
+}
+```
 
 ## Supported Agents
 
