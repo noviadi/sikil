@@ -1,12 +1,17 @@
 Implement the next eligible task (exactly ONE task this session).
 
-Select the task by reading:
-- docs/plan/STATE.yaml (what's done / current focus)
-- specs/implementation_roadmap.md (eligibility + subtasks)
+## Step 1: Determine what's DONE (read STATE.yaml FIRST)
 
-Rules:
-- Eligible = not done AND all [DEP: ...] are done.
-- If no eligible task, respond "No eligible tasks" and STOP.
+Read `docs/plan/STATE.yaml` and extract ALL task IDs from the `items:` section where `status: done`. These tasks are COMPLETE and must NOT be picked.
+
+## Step 2: Find eligible task from roadmap
+
+Read `specs/implementation_roadmap.md` to find the FIRST task that:
+1. Is NOT in the done list from Step 1
+2. Has all `[DEP: ...]` dependencies in the done list from Step 1
+
+## Rules
+- If no eligible task exists, respond "No eligible tasks" and STOP.
 - If any step fails, STOP and fix before proceeding.
 - When finished, run:
   ./scripts/finish-task.sh "<TASK_ID>" "<agent>" "<description>" \
