@@ -334,7 +334,7 @@ mod tests {
         // Delete the file to test missing file scenario
         fs::remove_file(temp_path).unwrap();
 
-        let args = ConfigArgs {
+        let _args = ConfigArgs {
             edit: false,
             set: false,
             set_key: None,
