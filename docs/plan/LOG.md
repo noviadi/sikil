@@ -391,3 +391,7 @@ Format:
 ### M5-E03-T04 — cascade — done
 - **Completed**: 2026-01-19T07:20:09Z
 - **Notes**: implement cross-platform builds documentation and test
+
+### M5-E04-T01 — cascade — done
+- **Completed**: 2026-01-19T07:25:35Z
+- **Notes**: Implement end-to-end integration tests
