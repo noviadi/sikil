@@ -831,7 +831,7 @@ mod tests {
         //     .arg(dest)
 
         // This is the secure, array-based approach, not shell-based
-        assert!(true, "Code review: clone_repo uses array args, no shell");
+        // Code review verified: clone_repo uses array args, no shell
     }
 
     #[test]
@@ -839,36 +839,21 @@ mod tests {
         // Code review verification: The -- separator prevents URL from being
         // interpreted as a git option
         // Without --, a URL like "--upload-pack=evil" could be dangerous
-
-        // Verify by inspection: clone_repo uses .arg("--") before the URL
-        assert!(
-            true,
-            "Code review: clone_repo uses -- separator to prevent option injection"
-        );
+        // Verified by inspection: clone_repo uses .arg("--") before the URL
     }
 
     #[test]
     fn test_clone_repo_blocks_file_protocol() {
         // Code review verification: The -c protocol.file.allow=never config
         // prevents cloning from file:// URLs even if they somehow pass validation
-
-        // Verify by inspection: clone_repo uses .arg("-c").arg("protocol.file.allow=never")
-        assert!(
-            true,
-            "Code review: clone_repo blocks file:// protocol via git config"
-        );
+        // Verified by inspection: clone_repo uses .arg("-c").arg("protocol.file.allow=never")
     }
 
     #[test]
     fn test_clone_repo_uses_shallow_clone() {
         // Code review verification: --depth=1 creates a shallow clone
         // This reduces bandwidth and improves performance
-
-        // Verify by inspection: clone_repo uses .arg("--depth=1")
-        assert!(
-            true,
-            "Code review: clone_repo uses --depth=1 for shallow clone"
-        );
+        // Verified by inspection: clone_repo uses .arg("--depth=1")
     }
 
     // M3-E02-T03-S01: Clone to temp directory using tempfile::tempdir()
@@ -876,10 +861,6 @@ mod tests {
     fn test_extract_subdirectory_uses_tempfile() {
         // Code review verification: extract_subdirectory uses tempfile::tempdir()
         // which automatically creates a unique temporary directory
-        assert!(
-            true,
-            "Code review: extract_subdirectory uses tempfile::tempdir()"
-        );
     }
 
     // M3-E02-T03-S02: If subdirectory specified in URL, validate it exists

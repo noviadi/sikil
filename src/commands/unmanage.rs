@@ -340,11 +340,11 @@ pub fn execute_unmanage(args: UnmanageArgs, config: &Config) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     /// Helper to create a test skill with SKILL.md
-    fn create_test_skill(dir: &PathBuf, name: &str) {
+    fn create_test_skill(dir: &Path, name: &str) {
         let content = format!(
             r#"---
 name: {}
@@ -362,13 +362,13 @@ This is a test skill."#,
     }
 
     /// Helper to create a test config with custom paths
-    fn create_test_config_with_paths(agent_path: &PathBuf) -> Config {
+    fn create_test_config_with_paths(agent_path: &Path) -> Config {
         let mut config = Config::new();
         config.insert_agent(
             "claude-code".to_string(),
             crate::core::config::AgentConfig::new(
                 true,
-                agent_path.clone(),
+                agent_path.to_path_buf(),
                 PathBuf::from(".skills"),
             ),
         );
@@ -376,7 +376,7 @@ This is a test skill."#,
     }
 
     /// Helper to setup a managed skill for testing
-    fn setup_managed_skill(repo_dir: &PathBuf, agent_dir: &PathBuf, skill_name: &str) -> PathBuf {
+    fn setup_managed_skill(repo_dir: &Path, agent_dir: &Path, skill_name: &str) -> PathBuf {
         // Create skill in repo
         let skill_repo_path = repo_dir.join(skill_name);
         fs::create_dir_all(&skill_repo_path).unwrap();
@@ -650,8 +650,8 @@ This is a test skill."#,
         assert!(err_msg.contains("invalid"));
 
         // Cleanup
-        let _ = fs::remove_dir_all(&repo_dir.join(skill_name));
-        let _ = fs::remove_file(&agent_dir.join(skill_name));
+        let _ = fs::remove_dir_all(repo_dir.join(skill_name));
+        let _ = fs::remove_file(agent_dir.join(skill_name));
     }
 
     #[test]
@@ -742,13 +742,18 @@ This is a test skill."#,
         let repo_dir = get_repo_path();
         fs::create_dir_all(&repo_dir).unwrap();
 
-        let skill_name = "confirm-skip-test";
-        let _skill_repo_path = setup_managed_skill(&repo_dir, &agent_dir, skill_name);
+        // Use unique skill name to avoid test interference
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let skill_name = format!("confirm-skip-test-{}", unique_id);
+        let _skill_repo_path = setup_managed_skill(&repo_dir, &agent_dir, &skill_name);
 
         let config = create_test_config_with_paths(&agent_dir);
         let args = UnmanageArgs {
             json_mode: false,
-            name: skill_name.to_string(),
+            name: skill_name.clone(),
             agent: None,
             yes: true, // Skip confirmation
         };
@@ -760,7 +765,7 @@ This is a test skill."#,
         );
 
         // Verify unmanage completed
-        let skill_path = agent_dir.join(skill_name);
+        let skill_path = agent_dir.join(&skill_name);
         assert!(skill_path.exists());
         assert!(!skill_path.is_symlink());
 

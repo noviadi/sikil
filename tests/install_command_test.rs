@@ -542,7 +542,7 @@ fn create_git_repo_with_skill(base_dir: &Path, repo_name: &str, skill_name: &str
     let actual_skill_name = if skill_name.is_empty() {
         repo_name
     } else {
-        skill_name.split('/').last().unwrap_or(skill_name)
+        skill_name.split('/').next_back().unwrap_or(skill_name)
     };
 
     let content = format!(

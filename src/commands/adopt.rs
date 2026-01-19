@@ -209,11 +209,11 @@ pub fn execute_adopt(args: AdoptArgs, config: &Config) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     /// Helper to create a test skill with SKILL.md
-    fn create_test_skill(dir: &PathBuf, name: &str) {
+    fn create_test_skill(dir: &Path, name: &str) {
         let content = format!(
             r#"---
 name: {}
@@ -231,13 +231,13 @@ This is a test skill."#,
     }
 
     /// Helper to create a test config with custom paths
-    fn create_test_config_with_paths(agent_path: &PathBuf) -> Config {
+    fn create_test_config_with_paths(agent_path: &Path) -> Config {
         let mut config = Config::new();
         config.insert_agent(
             "claude-code".to_string(),
             crate::core::config::AgentConfig::new(
                 true,
-                agent_path.clone(),
+                agent_path.to_path_buf(),
                 PathBuf::from(".skills"),
             ),
         );
@@ -372,11 +372,11 @@ This is a test skill."#,
         }
 
         // Cleanup
-        let _ = fs::remove_dir_all(&repo_dir.join("multi-location"));
+        let _ = fs::remove_dir_all(repo_dir.join("multi-location"));
         #[cfg(unix)]
         {
-            let _ = fs::remove_file(&agent1_dir.join("multi-location"));
-            let _ = fs::remove_dir_all(&agent2_dir.join("multi-location"));
+            let _ = fs::remove_file(agent1_dir.join("multi-location"));
+            let _ = fs::remove_dir_all(agent2_dir.join("multi-location"));
         }
     }
 
@@ -428,8 +428,8 @@ This is a test skill."#,
         assert!(err_msg.contains("multiple locations") || err_msg.contains("--from"));
 
         // Cleanup
-        let _ = fs::remove_dir_all(&agent1_dir.join("multi-skill"));
-        let _ = fs::remove_dir_all(&agent2_dir.join("multi-skill"));
+        let _ = fs::remove_dir_all(agent1_dir.join("multi-skill"));
+        let _ = fs::remove_dir_all(agent2_dir.join("multi-skill"));
     }
 
     // M3-E03-T04-S04: Integration test: adopt already managed
@@ -544,23 +544,30 @@ This is a test skill."#,
         let repo_dir = get_repo_path();
         fs::create_dir_all(&repo_dir).unwrap();
 
+        // Use unique skill name to avoid test interference
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let skill_name = format!("existing-skill-{}", unique_id);
+
         // Clean up any leftover from previous failed test runs first
-        let existing_skill = repo_dir.join("existing-skill");
+        let existing_skill = repo_dir.join(&skill_name);
         let _ = fs::remove_dir_all(&existing_skill);
 
         // Create skill already in repo
         fs::create_dir(&existing_skill).unwrap();
-        create_test_skill(&existing_skill, "existing-skill");
+        create_test_skill(&existing_skill, &skill_name);
 
         // Create unmanaged skill with same name
-        let skill_path = agent_dir.join("existing-skill");
+        let skill_path = agent_dir.join(&skill_name);
         fs::create_dir(&skill_path).unwrap();
-        create_test_skill(&skill_path, "existing-skill");
+        create_test_skill(&skill_path, &skill_name);
 
         let config = create_test_config_with_paths(&agent_dir);
         let args = AdoptArgs {
             json_mode: false,
-            name: "existing-skill".to_string(),
+            name: skill_name.clone(),
             from: None,
         };
 
