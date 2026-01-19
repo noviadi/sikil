@@ -287,3 +287,7 @@ Format:
 ### M3-E04-T03 — cascade — done
 - **Completed**: 2026-01-19T04:42:31Z
 - **Notes**: Wire Unmanage command to CLI
+
+### M3-E04-T04 — cascade — done
+- **Completed**: 2026-01-19T04:47:18Z
+- **Notes**: test unmanage command
