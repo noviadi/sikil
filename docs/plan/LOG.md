@@ -283,3 +283,7 @@ Format:
 ### M3-E05-T01 — claude-opus-4-5-20251101 — done
 - **Completed**: 2026-01-19T03:20:01Z
 - **Notes**: Implement Remove Logic
+
+### M3-E04-T03 — cascade — done
+- **Completed**: 2026-01-19T04:42:31Z
+- **Notes**: Wire Unmanage command to CLI
