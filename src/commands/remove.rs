@@ -934,4 +934,76 @@ This is a test skill."#,
         let _ = fs::remove_file(&link2);
         let _ = fs::remove_dir_all(&skill_repo_path);
     }
+
+    // M3-E05-T04-S06: Integration test: remove --agent claude-code,windsurf
+    #[test]
+    fn test_remove_multiple_agents_comma_separated() {
+        let temp_dir = TempDir::new().unwrap();
+        let agent1_dir = temp_dir.path().join("claude-code-dir");
+        let agent2_dir = temp_dir.path().join("windsurf-dir");
+        fs::create_dir_all(&agent1_dir).unwrap();
+        fs::create_dir_all(&agent2_dir).unwrap();
+
+        let repo_dir = get_repo_path();
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        let skill_name = "multi-agent-remove-test";
+
+        // Create skill in repo
+        let skill_repo_path = repo_dir.join(skill_name);
+        fs::create_dir_all(&skill_repo_path).unwrap();
+        create_test_skill(&skill_repo_path, skill_name);
+
+        // Create symlinks in both agent directories
+        let link1 = agent1_dir.join(skill_name);
+        let link2 = agent2_dir.join(skill_name);
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&skill_repo_path, &link1).unwrap();
+            std::os::unix::fs::symlink(&skill_repo_path, &link2).unwrap();
+        }
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                agent1_dir.clone(),
+                PathBuf::from(".skills"),
+            ),
+        );
+        config.insert_agent(
+            "windsurf".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                agent2_dir.clone(),
+                PathBuf::from(".skills"),
+            ),
+        );
+
+        // Remove from both agents using comma-separated list
+        let args = RemoveArgs {
+            json_mode: false,
+            name: skill_name.to_string(),
+            agent: Some("claude-code,windsurf".to_string()),
+            all: false,
+            yes: true,
+        };
+
+        let result = execute_remove(args, &config);
+        assert!(result.is_ok(), "Remove with comma-separated agents should succeed");
+
+        // Verify both symlinks were removed
+        #[cfg(unix)]
+        {
+            assert!(!link1.exists(), "claude-code symlink should be removed");
+            assert!(!link2.exists(), "windsurf symlink should be removed");
+        }
+
+        // Verify skill is still in repo (only symlinks removed, not repo)
+        assert!(skill_repo_path.exists(), "Skill should remain in repo when using --agent");
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&skill_repo_path);
+    }
 }
