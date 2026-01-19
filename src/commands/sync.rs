@@ -593,6 +593,153 @@ This is a test skill."#,
         assert!(err_msg.contains("either --all or a skill name"));
     }
 
+    // M4-E01-T03-S01: If agent has unmanaged skill with same name, fail with adopt suggestion
+    #[test]
+    fn test_sync_fails_on_unmanaged_skill_with_adopt_suggestion() {
+        let temp_dir = TempDir::new().unwrap();
+        let agent_dir = temp_dir.path().join("agents");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        // Create a managed skill in repo
+        let skill_repo_path = repo_dir.join("unmanaged-test-skill");
+        fs::create_dir(&skill_repo_path).unwrap();
+        create_test_skill(&skill_repo_path, "unmanaged-test-skill");
+
+        // Create an unmanaged (physical) skill directory in agent location
+        let agent_skill_path = agent_dir.join("unmanaged-test-skill");
+        fs::create_dir(&agent_skill_path).unwrap();
+        fs::write(
+            agent_skill_path.join("SKILL.md"),
+            "---\nname: unmanaged-test-skill\ndescription: Unmanaged skill\n---\n# Unmanaged Skill",
+        )
+        .unwrap();
+
+        let config = create_test_config_with_paths(&agent_dir);
+        let args = SyncArgs {
+            json_mode: false,
+            name: Some("unmanaged-test-skill".to_string()),
+            all: false,
+            to: Some("claude-code".to_string()),
+        };
+
+        let result = sync_single_skill(
+            "unmanaged-test-skill",
+            args,
+            &config,
+            &repo_dir,
+            &Output::new(false),
+        );
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("adopt"));
+        assert!(err_msg.contains("use `sikil adopt` to manage it"));
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&agent_skill_path);
+        let _ = fs::remove_dir_all(&skill_repo_path);
+    }
+
+    // M4-E01-T03-S02: Implement --to flag for specific agents
+    #[test]
+    fn test_sync_to_specific_agents() {
+        let temp_dir = TempDir::new().unwrap();
+        let agent_dir = temp_dir.path().join("agents");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        // Create a managed skill in repo
+        let skill_repo_path = repo_dir.join("specific-agents-skill");
+        fs::create_dir(&skill_repo_path).unwrap();
+        create_test_skill(&skill_repo_path, "specific-agents-skill");
+
+        let config = create_test_config_with_paths(&agent_dir);
+        let args = SyncArgs {
+            json_mode: false,
+            name: Some("specific-agents-skill".to_string()),
+            all: false,
+            to: Some("claude-code".to_string()), // Only to claude-code
+        };
+
+        let result = sync_single_skill(
+            "specific-agents-skill",
+            args,
+            &config,
+            &repo_dir,
+            &Output::new(false),
+        );
+        assert!(result.is_ok());
+
+        // Verify symlink was created only for the specified agent
+        let symlink_path = agent_dir.join("specific-agents-skill");
+        #[cfg(unix)]
+        {
+            assert!(symlink_path.exists());
+            assert!(symlink_path.is_symlink());
+        }
+
+        // Cleanup
+        let _ = fs::remove_file(&symlink_path);
+        let _ = fs::remove_dir_all(&skill_repo_path);
+    }
+
+    // M4-E01-T03-S03: Display "already synced" if nothing to do
+    #[test]
+    fn test_sync_already_synced_message() {
+        let temp_dir = TempDir::new().unwrap();
+        let agent_dir = temp_dir.path().join("agents");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        let repo_dir = temp_dir.path().join("repo");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        // Create a managed skill in repo
+        let skill_repo_path = repo_dir.join("already-synced-skill");
+        fs::create_dir(&skill_repo_path).unwrap();
+        create_test_skill(&skill_repo_path, "already-synced-skill");
+
+        // Create an existing symlink (already synced)
+        let symlink_path = agent_dir.join("already-synced-skill");
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&skill_repo_path, &symlink_path).unwrap();
+        }
+
+        let config = create_test_config_with_paths(&agent_dir);
+        let args = SyncArgs {
+            json_mode: false,
+            name: Some("already-synced-skill".to_string()),
+            all: false,
+            to: Some("claude-code".to_string()),
+        };
+
+        let result = sync_single_skill(
+            "already-synced-skill",
+            args,
+            &config,
+            &repo_dir,
+            &Output::new(false),
+        );
+        assert!(result.is_ok());
+
+        // The function should complete successfully without creating new symlinks
+        #[cfg(unix)]
+        {
+            assert!(symlink_path.exists());
+            assert!(symlink_path.is_symlink());
+            let target = fs::read_link(&symlink_path).unwrap();
+            assert_eq!(target, skill_repo_path);
+        }
+
+        // Cleanup
+        let _ = fs::remove_file(&symlink_path);
+        let _ = fs::remove_dir_all(&skill_repo_path);
+    }
+
     #[test]
     fn test_sync_all_empty_repo() {
         let temp_dir = TempDir::new().unwrap();
