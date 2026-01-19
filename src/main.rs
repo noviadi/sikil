@@ -1,7 +1,8 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_list, execute_show, execute_validate, ListArgs, ShowArgs, ValidateArgs,
+    execute_install_local, execute_list, execute_show, execute_validate, InstallArgs, ListArgs,
+    ShowArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -82,9 +83,16 @@ fn main() {
             }
         }
         sikil::cli::Commands::Install { source, r#to } => {
-            println!("Install command from: {:?}", source);
-            if let Some(agents) = r#to {
-                println!("  to agents: {:?}", agents);
+            // M3-E01-T04: Wire Install Command to CLI
+            // For now, only local paths are supported (Git install will be M3-E02)
+            let args = InstallArgs {
+                json_mode: cli.json,
+                path: source,
+                to,
+            };
+            if let Err(e) = execute_install_local(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Validate { path } => {
