@@ -1,9 +1,9 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_install_local, execute_list, execute_remove, execute_show,
+    execute_adopt, execute_install_local, execute_list, execute_remove, execute_show, execute_sync,
     execute_unmanage, execute_validate, AdoptArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs,
-    UnmanageArgs, ValidateArgs,
+    SyncArgs, UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -149,13 +149,16 @@ fn main() {
             }
         }
         sikil::cli::Commands::Sync { name, all, r#to } => {
-            if all {
-                println!("Sync all managed skills");
-            } else if let Some(skill_name) = name {
-                println!("Sync command for: {:?}", skill_name);
-            }
-            if let Some(agents) = r#to {
-                println!("  to agents: {:?}", agents);
+            // M4-E01-T04: Wire Sync Command to CLI
+            let args = SyncArgs {
+                json_mode: cli.json,
+                name,
+                all,
+                to,
+            };
+            if let Err(e) = execute_sync(args, &config, None) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Config { edit, set } => {

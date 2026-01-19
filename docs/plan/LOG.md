@@ -319,3 +319,7 @@ Format:
 ### M4-E01-T03 — cascade — done
 - **Completed**: 2026-01-19T05:40:56Z
 - **Notes**: implement sync guards
+
+### M4-E01-T04 — cascade — done
+- **Completed**: 2026-01-19T05:45:55Z
+- **Notes**: wire sync command to CLI
