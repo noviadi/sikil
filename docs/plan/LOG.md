@@ -315,3 +315,7 @@ Format:
 ### M4-E01-T02 — cascade — done
 - **Completed**: 2026-01-19T05:38:44Z
 - **Notes**: implement sync all flag
+
+### M4-E01-T03 — cascade — done
+- **Completed**: 2026-01-19T05:40:56Z
+- **Notes**: implement sync guards
