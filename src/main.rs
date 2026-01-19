@@ -1,9 +1,10 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_config, execute_install_local, execute_list, execute_remove,
-    execute_show, execute_sync, execute_unmanage, execute_validate, AdoptArgs, ConfigArgs,
-    InstallArgs, ListArgs, RemoveArgs, ShowArgs, SyncArgs, UnmanageArgs, ValidateArgs,
+    execute_adopt, execute_completions, execute_config, execute_install_local, execute_list,
+    execute_remove, execute_show, execute_sync, execute_unmanage, execute_validate, AdoptArgs,
+    CompletionsArgs, ConfigArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs, SyncArgs,
+    UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -181,9 +182,10 @@ fn main() {
             }
         }
         sikil::cli::Commands::Completions { shell, output } => {
-            println!("Completions for: {:?}", shell);
-            if let Some(out) = output {
-                println!("  output to: {:?}", out);
+            let args = CompletionsArgs { shell, output };
+            if let Err(e) = execute_completions(args) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
     }

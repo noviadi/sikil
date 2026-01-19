@@ -343,3 +343,7 @@ Format:
 ### M4-E02-T05 — cascade — done
 - **Completed**: 2026-01-19T06:03:07Z
 - **Notes**: implement config command tests
+
+### M5-E01-T01 — cascade — done
+- **Completed**: 2026-01-19T06:05:42Z
+- **Notes**: implement shell completions generation
