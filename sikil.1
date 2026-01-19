@@ -1,0 +1,89 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH sikil 1  "sikil 0.1.0" 
+.SH NAME
+sikil \- Manage AI coding assistant skills across multiple agents
+.SH SYNOPSIS
+\fBsikil\fR [\fB\-\-json\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-no\-cache\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+Manage AI coding assistant skills across multiple agents
+.SH OPTIONS
+.TP
+\fB\-\-json\fR
+Output in JSON format
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Enable verbose output
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Suppress all output (except JSON data on stdout)
+.TP
+\fB\-\-no\-cache\fR
+Disable cache for this command
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+sikil\-list(1)
+List installed skills
+.TP
+sikil\-show(1)
+Show detailed information about a skill
+.TP
+sikil\-install(1)
+Install a skill from a local path or Git repository
+.TP
+sikil\-validate(1)
+Validate a skill\*(Aqs SKILL.md file
+.TP
+sikil\-adopt(1)
+Adopt an unmanaged skill into management
+.TP
+sikil\-unmanage(1)
+Unmanage a skill (convert to unmanaged)
+.TP
+sikil\-remove(1)
+Remove an installed skill
+.TP
+sikil\-sync(1)
+Sync a skill to other agents
+.TP
+sikil\-config(1)
+Manage configuration
+.TP
+sikil\-completions(1)
+Generate shell completions
+.TP
+sikil\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH EXTRA
+
+EXAMPLES:
+    sikil list
+        List all installed skills
+
+    sikil show <skill>
+        Show detailed information about a skill
+
+    sikil install <path>
+        Install a skill from a local path
+
+    sikil install <git\-url>
+        Install a skill from a Git repository
+
+    sikil validate <path>
+        Validate a skill\*(Aqs SKILL.md file
+
+    sikil \-\-json list
+        Output in JSON format
+
+For more help on any command:
+    sikil <command> \-\-help
+.SH VERSION
+v0.1.0
+.SH AUTHORS
+Sikil Contributors
