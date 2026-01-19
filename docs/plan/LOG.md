@@ -351,3 +351,7 @@ Format:
 ### M5-E01-T02 — cascade — done
 - **Completed**: 2026-01-19T06:08:34Z
 - **Notes**: wire completions command to CLI
+
+### M5-E01-T03 — cascade — done
+- **Completed**: 2026-01-19T06:10:04Z
+- **Notes**: implement completion tests
