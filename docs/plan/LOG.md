@@ -371,3 +371,11 @@ Format:
 ### M5-E02-T04 — cascade — done
 - **Completed**: 2026-01-19T06:17:42Z
 - **Notes**: implement man page generation
+
+### M5-E03-T01 — cascade — done
+- **Completed**: 2026-01-19T06:21:04Z
+- **Notes**: implement release build configuration
+
+### M5-E03-T01 — cascade — done
+- **Completed**: 2026-01-19T06:21:11Z
+- **Notes**: implement release build configuration
