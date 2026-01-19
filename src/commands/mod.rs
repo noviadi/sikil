@@ -6,6 +6,7 @@ pub mod install;
 pub mod list;
 pub mod remove;
 pub mod show;
+pub mod sync;
 pub mod unmanage;
 pub mod validate;
 
@@ -15,5 +16,6 @@ pub use install::{execute_install_git, execute_install_local, InstallArgs};
 pub use list::{execute_list, ListArgs};
 pub use remove::{execute_remove, RemoveArgs};
 pub use show::{execute_show, ShowArgs};
+pub use sync::{execute_sync, SyncArgs};
 pub use unmanage::{execute_unmanage, UnmanageArgs};
 pub use validate::{execute_validate, ValidateArgs};
