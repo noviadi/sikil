@@ -1,8 +1,9 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_install_local, execute_list, execute_show, execute_unmanage,
-    execute_validate, AdoptArgs, InstallArgs, ListArgs, ShowArgs, UnmanageArgs, ValidateArgs,
+    execute_adopt, execute_install_local, execute_list, execute_remove, execute_show,
+    execute_unmanage, execute_validate, AdoptArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs,
+    UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -134,15 +135,17 @@ fn main() {
             all,
             yes,
         } => {
-            println!("Remove command for: {:?}", name);
-            if let Some(a) = agent {
-                println!("  agent: {:?}", a);
-            }
-            if all {
-                println!("  (remove all)");
-            }
-            if yes {
-                println!("  (skip confirmation)");
+            // M3-E05-T01-S02: Execute remove command
+            let args = RemoveArgs {
+                json_mode: cli.json,
+                name,
+                agent,
+                all,
+                yes,
+            };
+            if let Err(e) = execute_remove(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Sync { name, all, r#to } => {
