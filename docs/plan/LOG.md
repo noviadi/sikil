@@ -311,3 +311,7 @@ Format:
 ### M4-E01-T01 — cascade — done
 - **Completed**: 2026-01-19T05:30:21Z
 - **Notes**: implement sync command logic
+
+### M4-E01-T02 — cascade — done
+- **Completed**: 2026-01-19T05:38:44Z
+- **Notes**: implement sync all flag
