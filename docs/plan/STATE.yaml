@@ -1,5 +1,5 @@
 schema_version: 3
-updated_at: "2026-01-19T03:13:51Z"
+updated_at: "2026-01-19T03:20:01Z"
 
 roadmap: "specs/implementation_roadmap.md"
 
@@ -11,6 +11,7 @@ focus:
 # Task statuses (only non-todo items)
 # Evidence for all tasks: git log --grep="<TASK_ID>"
 items:
+  "M3-E05-T01": { status: done, at: "2026-01-19T03:20:01Z" }
   "M3-E04-T02": { status: done, at: "2026-01-19T03:13:51Z" }
   "M3-E02-T05": { status: done, at: "2026-01-19T02:22:40Z" }
   "M3-E02-T04": { status: done, at: "2026-01-19T02:17:41Z" }
