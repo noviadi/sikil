@@ -4,6 +4,7 @@
 
 mod common;
 
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 
 #[test]
@@ -274,14 +275,50 @@ fn test_all_subcommands_available() {
         .success()
         .stdout(contains("list"))
         .stdout(contains("show"))
-        .stdout(contains("install"))
         .stdout(contains("validate"))
+        .stdout(contains("install"))
         .stdout(contains("adopt"))
         .stdout(contains("unmanage"))
         .stdout(contains("remove"))
         .stdout(contains("sync"))
         .stdout(contains("config"))
         .stdout(contains("completions"));
+}
+
+#[test]
+fn test_completions_bash_output_non_empty() {
+    // Test bash output is non-empty
+    let mut cmd = sikil_cmd!();
+
+    cmd.arg("completions")
+        .arg("bash")
+        .assert()
+        .success()
+        .stdout(predicates::str::is_empty().not());
+}
+
+#[test]
+fn test_completions_zsh_output_non_empty() {
+    // Test zsh output is non-empty
+    let mut cmd = sikil_cmd!();
+
+    cmd.arg("completions")
+        .arg("zsh")
+        .assert()
+        .success()
+        .stdout(predicates::str::is_empty().not());
+}
+
+#[test]
+fn test_completions_fish_output_non_empty() {
+    // Test fish output is non-empty
+    let mut cmd = sikil_cmd!();
+
+    cmd.arg("completions")
+        .arg("fish")
+        .assert()
+        .success()
+        .stdout(predicates::str::is_empty().not());
 }
 
 #[test]
