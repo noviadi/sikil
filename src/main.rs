@@ -1,9 +1,9 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_install_local, execute_list, execute_remove, execute_show, execute_sync,
-    execute_unmanage, execute_validate, AdoptArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs,
-    SyncArgs, UnmanageArgs, ValidateArgs,
+    execute_adopt, execute_config, execute_install_local, execute_list, execute_remove,
+    execute_show, execute_sync, execute_unmanage, execute_validate, AdoptArgs, ConfigArgs,
+    InstallArgs, ListArgs, RemoveArgs, ShowArgs, SyncArgs, UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -162,14 +162,22 @@ fn main() {
             }
         }
         sikil::cli::Commands::Config { edit, set } => {
-            if edit {
-                println!("Config edit - not yet implemented");
-            }
-            if set {
-                println!("Config set - not yet implemented");
-            }
-            if !edit && !set {
-                println!("Config show - not yet implemented");
+            let (set_key, set_value) = if set.is_empty() {
+                (None, None)
+            } else {
+                (Some(set[0].clone()), Some(set[1].clone()))
+            };
+
+            let args = ConfigArgs {
+                edit,
+                set: !set.is_empty(),
+                set_key,
+                set_value,
+                json_mode: cli.json,
+            };
+            if let Err(e) = execute_config(args) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Completions { shell, output } => {

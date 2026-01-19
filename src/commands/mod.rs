@@ -2,6 +2,7 @@
 
 pub mod adopt;
 pub mod agent_selection;
+pub mod config;
 pub mod install;
 pub mod list;
 pub mod remove;
@@ -12,6 +13,7 @@ pub mod validate;
 
 pub use adopt::{execute_adopt, AdoptArgs};
 pub use agent_selection::{parse_agent_selection, prompt_agent_selection};
+pub use config::{execute_config, ConfigArgs};
 pub use install::{execute_install_git, execute_install_local, InstallArgs};
 pub use list::{execute_list, ListArgs};
 pub use remove::{execute_remove, RemoveArgs};

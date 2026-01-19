@@ -257,8 +257,8 @@ EXAMPLES:
         edit: bool,
 
         /// Set a config value (key.subkey value)
-        #[arg(long, value_names = ["KEY", "VALUE"])]
-        set: bool,
+        #[arg(long, num_args = 2, value_names = ["KEY", "VALUE"])]
+        set: Vec<String>,
     },
 
     /// Generate shell completions

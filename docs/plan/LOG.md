@@ -323,3 +323,7 @@ Format:
 ### M4-E01-T04 — cascade — done
 - **Completed**: 2026-01-19T05:45:55Z
 - **Notes**: wire sync command to CLI
+
+### M4-E02-T01 — cascade — done
+- **Completed**: 2026-01-19T05:49:23Z
+- **Notes**: implement config display
