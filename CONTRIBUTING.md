@@ -307,6 +307,38 @@ programmatic consumption of skill inventory.
 Closes #123
 ```
 
+#### Version Management
+
+Sikil follows [Semantic Versioning 2.0.0](https://semver.org/). Version numbers are managed in `Cargo.toml` and reflected in the CLI via `--version`.
+
+**Version Format**: `MAJOR.MINOR.PATCH` (e.g., `0.1.0`)
+
+**When to bump versions**:
+- **MAJOR**: Breaking changes to public API or command behavior
+- **MINOR**: New features, backward-compatible additions
+- **PATCH**: Bug fixes, documentation updates
+
+**Version bump process**:
+1. Update version in `Cargo.toml`:
+   ```toml
+   [package]
+   version = "0.2.0"  # Increment as appropriate
+   ```
+2. Update the `--version` flag in `src/cli/app.rs`:
+   ```rust
+   #[command(version = "0.2.0")]
+   ```
+3. Add an entry to `CHANGELOG.md` under the new version
+4. Commit and tag:
+   ```bash
+   git add Cargo.toml src/cli/app.rs CHANGELOG.md
+   git commit -m "chore: bump version to 0.2.0"
+   git tag v0.2.0
+   git push && git push --tags
+   ```
+
+**Important**: Always update both `Cargo.toml` and `src/cli/app.rs` to ensure version consistency.
+
 #### Pull Request Process
 
 1. **Update documentation** if needed
