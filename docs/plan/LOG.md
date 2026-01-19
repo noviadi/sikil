@@ -239,3 +239,7 @@ Format:
 ### M3-E01-T02 — claude-opus-4-5-20251101 — done
 - **Completed**: 2026-01-19T01:42:03Z
 - **Notes**: Implement install guards (skill exists check, physical dir check, symlink check, rollback on partial failure) with comprehensive unit tests
+
+### M3-E01-T03 — claude — done
+- **Completed**: 2026-01-19T01:47:22Z
+- **Notes**: implement agent selection for install command

@@ -5,10 +5,10 @@
 
 use crate::cli::output::Output;
 use crate::cli::output::Progress;
+use crate::commands::{parse_agent_selection, prompt_agent_selection};
 use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
-use crate::core::skill::Agent;
 use crate::utils::atomic::copy_skill_dir;
 use crate::utils::paths::{ensure_dir_exists, get_repo_path};
 use crate::utils::symlink::create_symlink;
@@ -23,8 +23,8 @@ pub struct InstallArgs {
     pub json_mode: bool,
     /// Path to the skill directory to install
     pub path: String,
-    /// Agents to install to (empty means "all" for now, will be interactive later)
-    pub agents: Vec<String>,
+    /// Agents to install to (from --to flag, None means interactive prompt)
+    pub to: Option<String>,
 }
 
 /// Executes the install command for a local path
@@ -62,7 +62,7 @@ pub struct InstallArgs {
 /// let args = InstallArgs {
 ///     json_mode: false,
 ///     path: "/path/to/skill".to_string(),
-///     agents: vec!["claude-code".to_string()],
+///     to: Some("claude-code".to_string()),
 /// };
 /// execute_install_local(args, &config).unwrap();
 /// ```
@@ -109,29 +109,23 @@ pub fn execute_install_local(args: InstallArgs, config: &Config) -> Result<()> {
 
     let skill_name = &metadata.name;
 
-    // Determine target agents
-    let target_agents = if args.agents.is_empty() {
-        // For now, use all enabled agents (will be interactive in M3-E01-T03)
-        config
-            .agents
-            .iter()
-            .filter(|(_, cfg)| cfg.enabled)
-            .filter_map(|(name, _)| Agent::from_cli_name(name))
-            .collect::<Vec<_>>()
+    // M3-E01-T03: Determine target agents from --to flag or interactive prompt
+    let target_agents = if let Some(to_value) = &args.to {
+        // Parse the --to flag value
+        parse_agent_selection(Some(to_value), config)?
     } else {
-        args.agents
-            .iter()
-            .map(|name| {
-                Agent::from_cli_name(name).ok_or_else(|| SikilError::ValidationError {
-                    reason: format!("unknown agent: {}", name),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?
+        // M3-E01-T03-S03: Prompt user if --to not specified (interactive)
+        // Skip prompt in JSON mode, use all enabled agents
+        if args.json_mode {
+            parse_agent_selection(Some("all"), config)?
+        } else {
+            prompt_agent_selection(config)?
+        }
     };
 
     if target_agents.is_empty() {
         return Err(SikilError::ValidationError {
-            reason: "no enabled agents to install to".to_string(),
+            reason: "no agents selected for installation".to_string(),
         }
         .into());
     }
@@ -326,12 +320,25 @@ This is a test skill."#,
         let args = InstallArgs {
             json_mode: true,
             path: "/path/to/skill".to_string(),
-            agents: vec!["claude-code".to_string(), "windsurf".to_string()],
+            to: Some("claude-code,windsurf".to_string()),
         };
 
         assert!(args.json_mode);
         assert_eq!(args.path, "/path/to/skill");
-        assert_eq!(args.agents.len(), 2);
+        assert_eq!(args.to, Some("claude-code,windsurf".to_string()));
+    }
+
+    #[test]
+    fn test_install_args_no_to() {
+        let args = InstallArgs {
+            json_mode: false,
+            path: "/path/to/skill".to_string(),
+            to: None,
+        };
+
+        assert!(!args.json_mode);
+        assert_eq!(args.path, "/path/to/skill");
+        assert!(args.to.is_none());
     }
 
     #[test]
@@ -373,7 +380,7 @@ This is a test skill."#,
         let args = InstallArgs {
             json_mode: false,
             path: source_dir.to_str().unwrap().to_string(),
-            agents: vec!["claude-code".to_string()],
+            to: Some("claude-code".to_string()),
         };
 
         let result = execute_install_local(args, &config);
@@ -410,7 +417,7 @@ This is a test skill."#,
         let args = InstallArgs {
             json_mode: false,
             path: source_dir.to_str().unwrap().to_string(),
-            agents: vec!["claude-code".to_string()],
+            to: Some("claude-code".to_string()),
         };
 
         let result = execute_install_local(args, &config);
@@ -452,7 +459,7 @@ This is a test skill."#,
         let args = InstallArgs {
             json_mode: false,
             path: source_dir.to_str().unwrap().to_string(),
-            agents: vec!["claude-code".to_string()],
+            to: Some("claude-code".to_string()),
         };
 
         let result = execute_install_local(args, &config);
@@ -559,7 +566,7 @@ This is a test skill."#,
         let args = InstallArgs {
             json_mode: false,
             path: source_dir.to_str().unwrap().to_string(),
-            agents: vec!["claude-code".to_string()],
+            to: Some("claude-code".to_string()),
         };
 
         let result = execute_install_local(args, &config);
