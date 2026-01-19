@@ -1,8 +1,8 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_install_local, execute_list, execute_show, execute_validate, InstallArgs, ListArgs,
-    ShowArgs, ValidateArgs,
+    execute_adopt, execute_install_local, execute_list, execute_show, execute_validate, AdoptArgs,
+    InstallArgs, ListArgs, ShowArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
 use sikil::core::skill::Agent;
@@ -106,9 +106,14 @@ fn main() {
             }
         }
         sikil::cli::Commands::Adopt { name, from } => {
-            println!("Adopt command for: {:?}", name);
-            if let Some(agent) = from {
-                println!("  from agent: {:?}", agent);
+            let args = AdoptArgs {
+                json_mode: cli.json,
+                name,
+                from,
+            };
+            if let Err(e) = execute_adopt(args, &config) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         sikil::cli::Commands::Unmanage { name, agent, yes } => {
