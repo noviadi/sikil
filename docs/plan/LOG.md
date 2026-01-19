@@ -335,3 +335,7 @@ Format:
 ### M4-E02-T03 — cascade — done
 - **Completed**: 2026-01-19T05:54:03Z
 - **Notes**: implement config set
+
+### M4-E02-T04 — cascade — done
+- **Completed**: 2026-01-19T05:58:37Z
+- **Notes**: Wire Config Command to CLI

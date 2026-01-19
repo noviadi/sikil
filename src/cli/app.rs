@@ -251,12 +251,26 @@ EXAMPLES:
     },
 
     /// Manage configuration
+    #[command(after_help = r##"
+EXAMPLES:
+    sikil config
+        Show current configuration
+
+    sikil config --edit
+        Open config file in editor
+
+    sikil config set agents.claude-code.enabled true
+        Set a config value
+
+    sikil config --json
+        Output in JSON format
+"##)]
     Config {
         /// Edit the config file
         #[arg(long)]
         edit: bool,
 
-        /// Set a config value (key.subkey value)
+        /// Set a config value (use: set <key> <value>)
         #[arg(long, num_args = 2, value_names = ["KEY", "VALUE"])]
         set: Vec<String>,
     },
