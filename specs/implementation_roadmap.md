@@ -828,6 +828,7 @@ src/
 | M3-E05-T01-S04 | If `--agent`, remove symlink from specified agents | Unit test passes |
 | M3-E05-T01-S05 | If `--all`, remove all symlinks AND repo entry | Unit test passes |
 | M3-E05-T01-S06 | Support removing unmanaged skills (delete physical dir) | Unit test passes |
+| M3-E05-T01-S07 | Parse comma-separated `--agent` values: `--agent claude-code,windsurf` | Unit test passes |
 
 ### M3-E05-T02: Implement Remove Confirmation `[N]` `[DEP: M3-E05-T01]`
 **Traces:** I: UC-07-07, UC-07-08, UC-07-09, UC-07-11 | V: NFR-05
@@ -838,6 +839,7 @@ src/
 | M3-E05-T02-S02 | Prompt for confirmation | Manual test |
 | M3-E05-T02-S03 | Implement `--yes` flag | Unit test passes |
 | M3-E05-T02-S04 | After `--agent` removal, prompt if no symlinks remain | Manual test |
+| M3-E05-T02-S05 | Display summary of removed locations after completion | Visual test |
 
 ### M3-E05-T03: Wire Remove Command to CLI `[L]` `[WIRE]` `[DEP: M3-E05-T02]`
 
@@ -856,6 +858,7 @@ src/
 | M3-E05-T04-S03 | Integration test: remove --all unmanaged | Physical dir deleted |
 | M3-E05-T04-S04 | Integration test: remove without flags | Error requiring flag |
 | M3-E05-T04-S05 | Integration test: remove non-existent skill | Error message |
+| M3-E05-T04-S06 | Integration test: remove --agent claude-code,windsurf | Both symlinks removed |
 
 ---
 

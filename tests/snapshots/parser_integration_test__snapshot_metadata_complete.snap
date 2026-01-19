@@ -1,0 +1,12 @@
+---
+source: tests/parser_integration_test.rs
+assertion_line: 232
+expression: json
+---
+{
+  "name": "complete-skill",
+  "description": "A skill with all optional fields populated",
+  "version": "1.0.0",
+  "author": "Jane Developer",
+  "license": "MIT"
+}
