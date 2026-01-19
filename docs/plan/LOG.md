@@ -299,3 +299,7 @@ Format:
 ### M3-E05-T02 — cascade — done
 - **Completed**: 2026-01-19T05:11:02Z
 - **Notes**: implement remove confirmation
+
+### M3-E05-T03 — cascade — done
+- **Completed**: 2026-01-19T05:13:17Z
+- **Notes**: wire remove command to CLI
