@@ -363,3 +363,7 @@ Format:
 ### M5-E02-T02 — cascade — done
 - **Completed**: 2026-01-19T06:13:18Z
 - **Notes**: create CONTRIBUTING.md with development setup, testing instructions, and code style guidelines
+
+### M5-E02-T03 — cascade — done
+- **Completed**: 2026-01-19T06:14:47Z
+- **Notes**: create CHANGELOG.md with Keep a Changelog format and v0.1.0 features documentation
