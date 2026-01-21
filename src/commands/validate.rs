@@ -33,9 +33,30 @@ pub struct ValidationResult {
     /// Warnings (non-fatal issues)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub warnings: Option<Vec<String>>,
+    /// Detected metadata from the skill
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<DetectedMetadata>,
     /// Detected directories in the skill
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detected_directories: Option<DetectedDirectories>,
+}
+
+/// Detected metadata from a skill's SKILL.md
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DetectedMetadata {
+    /// Skill name
+    pub name: String,
+    /// Skill description
+    pub description: String,
+    /// Optional version
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Optional author
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    /// Optional license
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
 }
 
 /// A single validation check
@@ -115,6 +136,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
             skill_path: skill_dir.to_string_lossy().to_string(),
             checks,
             warnings: Some(warnings),
+            metadata: None,
             detected_directories: None,
         };
 
@@ -138,6 +160,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
             skill_path: skill_dir.to_string_lossy().to_string(),
             checks,
             warnings: Some(warnings),
+            metadata: None,
             detected_directories: None,
         };
 
@@ -166,6 +189,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
                 skill_path: skill_dir.to_string_lossy().to_string(),
                 checks,
                 warnings: Some(warnings),
+                metadata: None,
                 detected_directories: None,
             };
 
@@ -207,6 +231,15 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
     // Detect directories
     let detected_directories = detect_directories(&skill_dir);
 
+    // Build detected metadata
+    let detected_metadata = DetectedMetadata {
+        name: metadata.name.clone(),
+        description: metadata.description.clone(),
+        version: metadata.version.clone(),
+        author: metadata.author.clone(),
+        license: metadata.license.clone(),
+    };
+
     // Determine if all checks passed
     let passed = checks.iter().all(|c| c.passed);
 
@@ -219,6 +252,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
         } else {
             Some(warnings)
         },
+        metadata: Some(detected_metadata),
         detected_directories: Some(detected_directories),
     };
 
@@ -412,6 +446,22 @@ fn print_human_readable(output: &Output, result: &ValidationResult) {
             if let Some(ref error) = check.error {
                 output.print_error(&format!("  {}", error));
             }
+        }
+    }
+
+    // Print metadata
+    if let Some(ref meta) = result.metadata {
+        output.print_info("");
+        output.print_info("Metadata:");
+        output.print_info(&format!("  name: {}", meta.name));
+        if let Some(ref version) = meta.version {
+            output.print_info(&format!("  version: {}", version));
+        }
+        if let Some(ref author) = meta.author {
+            output.print_info(&format!("  author: {}", author));
+        }
+        if let Some(ref license) = meta.license {
+            output.print_info(&format!("  license: {}", license));
         }
     }
 
@@ -616,6 +666,13 @@ description: No frontmatter markers"#;
                 error: None,
             }],
             warnings: None,
+            metadata: Some(DetectedMetadata {
+                name: "test-skill".to_string(),
+                description: "A test skill".to_string(),
+                version: Some("1.0.0".to_string()),
+                author: Some("Test Author".to_string()),
+                license: Some("MIT".to_string()),
+            }),
             detected_directories: Some(DetectedDirectories {
                 has_scripts: true,
                 has_references: false,
@@ -626,6 +683,9 @@ description: No frontmatter markers"#;
         assert!(json.contains("\"passed\":true"));
         assert!(json.contains("\"skill_path\":\"/path/to/skill\""));
         assert!(json.contains("\"has_scripts\":true"));
+        assert!(json.contains("\"name\":\"test-skill\""));
+        assert!(json.contains("\"version\":\"1.0.0\""));
+        assert!(json.contains("\"author\":\"Test Author\""));
     }
 
     #[test]
