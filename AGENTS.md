@@ -1,96 +1,71 @@
-# Agent Execution Guidance
+# Sikil Development Guide
 
-## IMPORTANT: One Task at a Time
+Rust CLI for managing Agent Skills across AI coding agents.
 
-**Execute exactly ONE task per session.** Do not batch multiple tasks.
+## Build & Run
 
----
-
-## Quick Reference
-
-| File | Purpose |
-|------|---------|
-| `docs/plan/STATE.yaml` | Task statuses, current focus |
-| `docs/plan/LOG.md` | Session history (append-only) |
-| `specs/implementation_roadmap.md` | Task subtasks and dependencies |
-
----
-
-## Workflow
-
-### 1. Pick Task
-1. Read `docs/plan/STATE.yaml` → check which tasks are `done`
-2. Read `specs/implementation_roadmap.md` → find **ONE** smallest eligible task ID
-   - Eligible = not done + all `[DEP: ...]` are done
-3. Update STATE.yaml: `focus: { current_task: "<ID>", by: "<agent>" }`
-
-**STOP here if no eligible task. Do NOT pick multiple tasks.**
-
-### 2. Implement
-1. Read task's subtask table in roadmap
-2. Implement each subtask
-3. Verify against "Verifiable By" column
-
-### 3. Complete (ONE command)
-
-```
-□ Run: ./scripts/finish-task.sh "<TASK_ID>" "<agent>" "<description>" \
-    --subtask "S01:<evidence>" --subtask "S02:<evidence>" ...
-```
-
-This single command:
-1. Runs `verify.sh` (fails fast if tests/clippy/fmt fail)
-2. Updates STATE.yaml + LOG.md via `complete-task.sh`
-3. Creates properly formatted commit with verification results
-
-**Options:**
-- `--notes "<notes>"` — Custom notes for LOG.md (defaults to description)
-- `--force` — Skip focus mismatch check
-- `--no-verify` — Skip verification (use with caution)
-
-**Example:**
 ```bash
-./scripts/finish-task.sh "M2-E01-T05" "amp" "implement cache integration" \
-  --subtask "S01:Added CacheService struct" \
-  --subtask "S02:Unit tests in cache_test.rs"
+cargo build                     # Debug build
+cargo build --release           # Optimized release build
+cargo run -- <args>             # Run CLI (e.g., cargo run -- list)
+./scripts/build.sh              # Release build with optional cross-compilation
 ```
 
----
+## Validation
 
-## Source of Truth
+Run after implementing to get immediate feedback:
 
-- [PRD.md](specs/PRD.md) - Product requirements
-- [TRD.md](specs/TRD.md) - Technical specs
-- [implementation_roadmap.md](specs/implementation_roadmap.md) - Task breakdown
-- [use_cases.md](specs/use_cases.md) - Acceptance criteria
-- [traceability_matrix.md](specs/traceability_matrix.md) - Requirements coverage
+```bash
+./scripts/verify.sh             # Full validation (tests + clippy + fmt)
+cargo test                      # Run all tests
+cargo test --test e2e_test      # Single integration test file
+cargo test test_name            # Specific test
+cargo clippy -- -D warnings     # Lint
+cargo fmt --check               # Format check
+cargo insta review              # Review snapshot changes
+```
 
-The `specs/research_archive/` directory is background only. DO NOT use as requirements.
+## Task Completion
 
----
+Complete one task at a time using:
+```bash
+./scripts/finish-task.sh "TASK_ID" "agent" "description" --subtask "S01:evidence"
+```
 
-## Project Context
+This runs verify, updates STATE.yaml/LOG.md, and commits atomically.
 
-**Sikil** is a Rust CLI for managing Agent Skills across 5 AI coding agents.
+## Operational Notes
 
-- Tech: Rust 2021, clap 4, serde, rusqlite, anyhow/thiserror
-- Targets: macOS (Intel/ARM), Linux (x86_64/aarch64)
-- Architecture: `cli/` → `commands/` → `core/` → `utils/`
+### Architecture
 
-## Implementation Rules
+Dependencies flow: `cli/` → `commands/` → `core/` → `utils/`
 
-**Architecture**
-- Dependencies flow downward: `cli/` → `commands/` → `core/` → `utils/`
-- `thiserror` in `core/`, `anyhow` in `commands/`
-- `fs-err` over `std::fs`
+| Layer | Location | Error Handling |
+|-------|----------|----------------|
+| CLI | `src/cli/` | Exit codes (0,2,3,4,5) |
+| Commands | `src/commands/<cmd>.rs` | `anyhow` |
+| Core | `src/core/` | `thiserror` |
+| Utils | `src/utils/` | Propagate up |
 
-**File Locations**
-- Commands: `src/commands/<cmd>.rs`
+### Codebase Patterns
+
+- **Filesystem**: Use `fs-err` (not `std::fs`); atomic symlinks via temp + rename
+- **Serde**: `rename_all = "kebab-case"`; `deny_unknown_fields` for config
+- **CLI output**: Return serializable structs; `--json` flag; use `Vec`/`BTreeMap` for determinism
+- **Git**: GitHub-only URLs, `--depth=1`, disable hooks
+- **Testing**: `assert_cmd` + `predicates` for CLI; fixtures in `tests/fixtures/`; `insta` for snapshots
+
+### File Conventions
+
 - Domain types: `src/core/{skill,agent}.rs`
-- Utilities: `src/utils/{paths,symlink,atomic,git}.rs`
+- Commands: `src/commands/<cmd>.rs` with `Args` struct + `execute_*` fn
+- Utils: `src/utils/{paths,symlink,atomic,git}.rs`
 
-**Testing**
-- Unit tests in `src/**/tests.rs`
-- Integration tests in `tests/*.rs`
+### Reference Documents
 
-Read [docs/coding-practices.md](docs/coding-practices.md) for detailed patterns.
+| Document | Purpose |
+|----------|---------|
+| `specs/PRD.md` | Product requirements |
+| `specs/TRD.md` | Technical specifications |
+| `specs/implementation_roadmap.md` | Task breakdown |
+| `docs/coding-practices.md` | Detailed patterns |
