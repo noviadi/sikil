@@ -175,6 +175,21 @@ pub fn validate_skill_name(name: &str) -> Result<(), SikilError> {
     Ok(())
 }
 
+/// Nested metadata block structure for SKILL.md frontmatter
+///
+/// Some skills put author/version under a `metadata:` block
+#[derive(Debug, Deserialize, Default)]
+struct NestedMetadata {
+    /// Optional version string
+    version: Option<String>,
+
+    /// Optional author
+    author: Option<String>,
+
+    /// Optional license
+    license: Option<String>,
+}
+
 /// Raw YAML structure for parsing SKILL.md frontmatter
 ///
 /// This struct uses `Option` for all fields to allow graceful handling
@@ -187,14 +202,17 @@ struct RawSkillMetadata {
     /// Human-readable description (required)
     description: Option<String>,
 
-    /// Optional version string
+    /// Optional version string (top-level)
     version: Option<String>,
 
-    /// Optional author
+    /// Optional author (top-level)
     author: Option<String>,
 
-    /// Optional license
+    /// Optional license (top-level)
     license: Option<String>,
+
+    /// Optional nested metadata block
+    metadata: Option<NestedMetadata>,
 }
 
 /// Parses a SKILL.md file and extracts its metadata.
@@ -263,13 +281,19 @@ pub fn parse_skill_md(path: &Path) -> Result<SkillMetadata, SikilError> {
         reason: "missing required field 'description'".to_string(),
     })?;
 
+    // Merge top-level fields with nested metadata block (top-level takes precedence)
+    let nested = raw.metadata.unwrap_or_default();
+    let version = raw.version.or(nested.version);
+    let author = raw.author.or(nested.author);
+    let license = raw.license.or(nested.license);
+
     // Build and return the SkillMetadata
     Ok(SkillMetadata {
         name,
         description,
-        version: raw.version,
-        author: raw.author,
-        license: raw.license,
+        version,
+        author,
+        license,
     })
 }
 
@@ -538,6 +562,55 @@ license: MIT
         assert_eq!(metadata.version, Some("1.0.0".to_string()));
         assert_eq!(metadata.author, Some("Test Author".to_string()));
         assert_eq!(metadata.license, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn test_parse_skill_md_nested_metadata_block() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: nested-skill
+description: A skill with nested metadata block
+license: MIT
+metadata:
+  author: Nested Author
+  version: "2.0.0"
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.name, "nested-skill");
+        assert_eq!(metadata.version, Some("2.0.0".to_string()));
+        assert_eq!(metadata.author, Some("Nested Author".to_string()));
+        assert_eq!(metadata.license, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn test_parse_skill_md_top_level_overrides_nested() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        let content = r#"---
+name: override-skill
+description: Top-level takes precedence
+version: 1.0.0
+author: Top Author
+metadata:
+  author: Nested Author
+  version: "2.0.0"
+---
+
+# Documentation"#;
+        fs::write(&skill_path, content).unwrap();
+
+        let result = parse_skill_md(&skill_path);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.version, Some("1.0.0".to_string()));
+        assert_eq!(metadata.author, Some("Top Author".to_string()));
     }
 
     #[test]
