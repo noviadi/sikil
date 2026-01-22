@@ -67,6 +67,12 @@ This produces optimized, small binaries (~10MB target).
 | `assert_cmd` | 2 | CLI integration testing |
 | `predicates` | 3 | Test assertions |
 | `insta` | 1 | Snapshot testing |
+
+### Build Dependencies
+
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `clap` | 4 | CLI structure for man page generation |
 | `clap_mangen` | 0.2 | Man page generation |
 
 ## Runtime Requirements
@@ -79,6 +85,23 @@ Git is invoked via `std::process::Command`:
 
 ```
 git clone -c protocol.file.allow=never --depth=1 -- <url> <dest>
+```
+
+## Build Script
+
+The `build.rs` script generates the `sikil.1` man page automatically during release builds. It imports `src/cli/app.rs` directly (via `#[path]`) and uses `clap_mangen` to render the man page, ensuring the man page always stays in sync with the CLI.
+
+**Triggers:**
+- Release builds (`cargo build --release`)
+- When `SIKIL_GENERATE_MAN=1` environment variable is set
+
+**Output:** `sikil.1` in the project root
+
+To force man page regeneration during development:
+```bash
+./scripts/generate-man.sh
+# or
+SIKIL_GENERATE_MAN=1 cargo build
 ```
 
 ## Build Commands
@@ -94,6 +117,8 @@ cargo build
 ```bash
 cargo build --release
 ```
+
+This also regenerates the man page.
 
 ### Cross-Compilation
 
