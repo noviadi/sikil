@@ -6,37 +6,37 @@ Rust CLI for managing Agent Skills across AI coding agents.
 
 ```bash
 cargo build                     # Debug build
-cargo build --release           # Optimized release build
+cargo build --release           # Release build
 cargo run -- <args>             # Run CLI (e.g., cargo run -- list)
-./scripts/build.sh              # Release build with optional cross-compilation
 ```
 
-## Validation
+## Validation (Loopback)
 
-Run after implementing to get immediate feedback:
+Run after every change to get immediate feedback:
 
 ```bash
-./scripts/verify.sh             # Full validation (tests + clippy + fmt)
-cargo test                      # Run all tests
-cargo test --test e2e_test      # Single integration test file
-cargo test test_name            # Specific test
-cargo clippy -- -D warnings     # Lint
+./scripts/verify.sh             # Full suite: tests + clippy + fmt
+cargo test                      # All tests
+cargo test test_name            # Single test
+cargo clippy -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check               # Format check
 cargo insta review              # Review snapshot changes
 ```
 
-## Task Completion
+## Task Workflow
 
-Complete one task at a time using:
-```bash
-./scripts/finish-task.sh "TASK_ID" "agent" "description" --subtask "S01:evidence"
-```
+1. Pick one uncompleted task from `IMPLEMENTATION_PLAN.md`
+2. Read linked spec in `specs/`
+3. Write tests first (TDD), run to confirm red
+4. Implement until green
+5. Run `./scripts/verify.sh`
+6. Update task: `Completed: true`, populate `Tests:`
+7. Commit all changes
+8. Exit
 
-This runs verify, updates STATE.yaml/LOG.md, and commits atomically.
+See `docs/prompts/implement-task.md` for full workflow and rules.
 
-## Operational Notes
-
-### Architecture
+## Architecture
 
 Dependencies flow: `cli/` → `commands/` → `core/` → `utils/`
 
@@ -47,29 +47,18 @@ Dependencies flow: `cli/` → `commands/` → `core/` → `utils/`
 | Core | `src/core/` | `thiserror` |
 | Utils | `src/utils/` | Propagate up |
 
-### Codebase Patterns
+## Codebase Patterns
 
-- **Filesystem**: Use `fs-err` (not `std::fs`); atomic symlinks via temp + rename
+- **Filesystem**: `fs-err` (not `std::fs`); atomic symlinks via temp + rename
 - **Serde**: `rename_all = "kebab-case"`; `deny_unknown_fields` for config
-- **CLI output**: Return serializable structs; `--json` flag; use `Vec`/`BTreeMap` for determinism
+- **CLI output**: Serializable structs; `--json` flag; `Vec`/`BTreeMap` for determinism
 - **Git**: GitHub-only URLs, `--depth=1`, disable hooks
-- **Testing**: `assert_cmd` + `predicates` for CLI; fixtures in `tests/fixtures/`; `insta` for snapshots
+- **Testing**: `assert_cmd` + `predicates`; fixtures in `tests/fixtures/`; `insta` for snapshots
 
-### File Conventions
+## TDD in Rust
 
-- Domain types: `src/core/{skill,agent}.rs`
-- Commands: `src/commands/<cmd>.rs` with `Args` struct + `execute_*` fn
-- Utils: `src/utils/{paths,symlink,atomic,git}.rs`
+When writing tests first, create minimal stubs (`todo!()`, `unimplemented!()`) so tests compile. First test run should fail on assertion or `todo!()` panic, not missing symbols.
 
-### Reference Documents
+## Source of Truth
 
-**For agents**
-
-| Document | Purpose |
-|----------|---------|
-| `specs/*.md` | Source of truth on how the cli works and implemented  |
-| `docs/coding-practices.md` | Detailed patterns |
-
-STRICTLY USE specs/*.md only as the source of truth. DO NOT refer to other document unless commanded explicitly.
-Whenever required, study the docs using subagents.
-
+`specs/*.md` — Source of truth for behavior/requirements. Workflow docs (`AGENTS.md`, `docs/`) govern process.

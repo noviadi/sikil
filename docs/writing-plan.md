@@ -54,6 +54,8 @@ Regeneration **completely rewrites** `IMPLEMENTATION_PLAN.md`:
 
 Do **not** attempt to preserve completion state or merge with the old plan. Each regeneration is a clean slate based on current reality.
 
+**Note:** `Completed: true` is meaningful only within the current plan snapshot. Tests and `verify.sh` passing are the durable evidence of completion, not the flag itself.
+
 ## Gap Analysis Process
 
 ### Step 1: Load Context
@@ -308,7 +310,7 @@ When implementing a task, you may discover behavior not specified in the spec:
 2. Add a note to the current task describing the discovery
 3. Add the spec to the **Spec Issues** section with details
 4. Complete the current task with only its original AC
-5. The spec issue blocks further tasks in that area until spec is fixed
+5. The spec issue blocks further tasks for that specific spec until resolved
 
 Example:
 ```markdown
@@ -328,31 +330,28 @@ Example:
 
 ## Resolving Spec Issues
 
-Spec Issues block task creation. To unblock:
+Spec Issues block task creation for that specific spec. To unblock:
 
-1. **Stop planning** for areas with Spec Issues
+1. **Stop planning** for the affected spec
 2. **Fix the spec** - Add missing AC, clarify ambiguous behavior, or document removal
 3. **Re-run gap analysis** after spec is fixed
 4. Previously blocked gaps now become valid tasks
 
-**Workflow:**
+Tasks for unrelated specs may proceed while a Spec Issue is open.
 
-```
-Spec Issue identified
-        ↓
-Update spec with missing AC
-        ↓
-Commit spec changes
-        ↓
-Re-run gap analysis
-        ↓
-Tasks created for previously blocked gaps
-```
+**Spec-fix workflow (one session):**
+
+1. Pick one Spec Issue from `IMPLEMENTATION_PLAN.md`
+2. Update the spec with missing AC or clarification
+3. Commit spec changes
+4. Exit
+
+Then re-run gap analysis in a subsequent session.
 
 **Do not:**
 - Create tasks without AC (violates SSOT)
 - Invent AC during planning (specs are source of truth)
-- Skip Spec Issues and proceed with partial plan
+- Skip Spec Issues and proceed with partial plan for that spec
 
 Spec maintenance is valid work. If many Spec Issues exist, prioritize fixing specs before implementation.
 
