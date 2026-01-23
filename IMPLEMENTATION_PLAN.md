@@ -42,3 +42,77 @@ None - all specs have complete Acceptance Criteria.
   - Modified install command handler to route to `execute_install_git` for Git URLs, `execute_install_local` for filesystem paths
   - Git URL detection rejects absolute paths, relative paths with dots, paths starting with `-`, and existing filesystem paths
   - Short-form Git URLs (owner/repo) are detected only when they don't exist as local paths
+
+### Replace SqliteCache with JsonCache implementation
+- **Spec:** cache.md
+- **Gap:** Cache uses SQLite (rusqlite) but spec defines JSON file-based cache with atomic writes
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `get(path)` returns cached entry when SKILL.md mtime matches cached mtime
+  - `get(path)` returns `None` when SKILL.md mtime differs from cached mtime
+  - `get(path)` returns `None` when SKILL.md file no longer exists
+  - `get(path)` returns `Ok(None)` on cache read/parse failure (non-fatal)
+  - `put(entry)` inserts new entry with path as key
+  - `put(entry)` replaces existing entry when path matches
+  - `put(entry)` rejects content hash exceeding 64 characters
+  - `invalidate(path)` removes entry for the specified path
+  - `clean_stale()` removes all entries for non-existent paths
+  - `clean_stale()` returns count of removed entries
+  - `clear()` removes all entries from cache
+  - Cache version mismatch triggers full cache clear
+  - Cache file exceeding 15 MB triggers full cache clear
+  - Write uses atomic temp file + rename pattern
+  - Cache read failure is treated as cache miss (non-fatal)
+  - Cache write failure is non-fatal (operation continues)
+  - Cache file is created at `~/.sikil/cache.json`
+- **Tests:**
+- **Location:** src/core/cache.rs
+- **Notes:**
+  - Replace `SqliteCache` struct with `JsonCache` 
+  - Add `CacheFile` struct with `version: u32` and `entries: BTreeMap<String, ScanEntry>`
+  - Use SKILL.md file mtime for invalidation (not directory mtime)
+  - Implement atomic write: write to cache.json.tmp, then rename to cache.json
+  - Check file size on load, clear if >15 MB
+  - All cache errors except put() with invalid hash are non-fatal
+
+### Update get_cache_path to return cache.json
+- **Spec:** filesystem-paths.md
+- **Gap:** `get_cache_path()` returns `cache.sqlite` but spec defines `cache.json`
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `get_cache_path` returns `~/.sikil/cache.json` expanded to absolute path
+- **Tests:**
+- **Location:** src/utils/paths.rs
+- **Notes:**
+  - Change line 108: `.join("cache.sqlite")` → `.join("cache.json")`
+  - Update docstring on line 103
+  - Update test assertion on line 201
+
+### Update scanner to use JsonCache
+- **Spec:** skill-scanner.md
+- **Gap:** Scanner imports and uses `SqliteCache` but spec references `Cache` (JSON)
+- **Completed:** false
+- **Acceptance Criteria:**
+  - Symlinks pointing to `~/.sikil/repo/` are classified as managed
+  - Symlinks pointing outside `~/.sikil/repo/` are classified as foreign symlinks
+  - Non-existent symlink targets are classified as broken symlinks
+  - Physical directories (not symlinks) are classified as unmanaged
+- **Tests:**
+- **Location:** src/core/scanner.rs
+- **Notes:**
+  - Change import from `SqliteCache` to `JsonCache`
+  - Update `cache: Option<SqliteCache>` field to `cache: Option<JsonCache>`
+  - Update constructor calls
+
+### Remove rusqlite dependency from Cargo.toml
+- **Spec:** build-and-platform.md
+- **Gap:** Cargo.toml includes `rusqlite` but spec no longer lists it as a dependency
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `cargo build --release` produces binary under 10MB
+- **Tests:**
+- **Location:** Cargo.toml
+- **Notes:**
+  - Remove line 18: `rusqlite = { version = "0.31", features = ["bundled"] }`
+  - This task depends on: Replace SqliteCache with JsonCache, Update scanner to use JsonCache
+  - Binary size should decrease by ~1-2 MB
