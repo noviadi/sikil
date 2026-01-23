@@ -607,14 +607,25 @@ mod tests {
 
         cache.put(&entry).unwrap();
 
-        // Manually create a cache file that exceeds size limit
+        // Create JSON that exceeds size limit by using a very long content_hash
+        // This ensures the file size exceeds MAX_CACHE_SIZE
+        let padding_size = MAX_CACHE_SIZE as usize + 1;
         let huge_content = format!(
             r#"{{"version": 1, "entries": {{"/test/skill": {{"mtime": 1234567890, "size": 1024, "content_hash": "{}", "cached_at": 1234567890, "skill_name": null, "is_valid_skill": true}}}}}}"#,
-            "a".repeat(MAX_CACHE_SIZE as usize)
+            "a".repeat(padding_size)
         );
-        fs::write(&cache_path, huge_content).unwrap();
+        fs::write(&cache_path, &huge_content).unwrap();
 
-        // Load should return None due to size limit
+        // Verify the file actually exceeds the size limit
+        let file_size = fs::metadata(&cache_path).unwrap().len();
+        assert!(
+            file_size > MAX_CACHE_SIZE,
+            "Test file should exceed MAX_CACHE_SIZE ({} > {})",
+            file_size,
+            MAX_CACHE_SIZE
+        );
+
+        // Load should return None due to size limit check
         assert!(cache.load().is_none());
     }
 
