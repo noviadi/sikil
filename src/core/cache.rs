@@ -27,7 +27,7 @@ pub trait Cache {
     /// Get cached scan entry for a directory path.
     ///
     /// Returns `None` if not cached or if the entry is invalid due to
-    /// mtime/size mismatch.
+    /// mtime mismatch.
     fn get(&self, path: &Path) -> Result<Option<ScanEntry>, SikilError>;
 
     /// Put a scan entry into the cache.
@@ -56,7 +56,7 @@ pub struct ScanEntry {
     /// Last modification time of SKILL.md (for invalidation)
     pub mtime: u64,
 
-    /// Size of SKILL.md in bytes (for fast invalidation)
+    /// Size of SKILL.md in bytes
     pub size: u64,
 
     /// Hash of the directory contents (for content-based invalidation)
