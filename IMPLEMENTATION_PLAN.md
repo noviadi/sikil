@@ -78,15 +78,15 @@ None - all specs have complete Acceptance Criteria.
 ### Update get_cache_path to return cache.json
 - **Spec:** filesystem-paths.md
 - **Gap:** `get_cache_path()` returns `cache.sqlite` but spec defines `cache.json`
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `get_cache_path` returns `~/.sikil/cache.json` expanded to absolute path
-- **Tests:**
+- **Tests:** src/utils/paths.rs (test_get_cache_path)
 - **Location:** src/utils/paths.rs
 - **Notes:**
-  - Change line 108: `.join("cache.sqlite")` → `.join("cache.json")`
-  - Update docstring on line 103
-  - Update test assertion on line 201
+  - Changed line 108: `.join("cache.sqlite")` → `.join("cache.json")`
+  - Updated docstring on line 91 and example on line 103
+  - Updated test assertion on line 201
 
 ### Update scanner to use JsonCache
 - **Spec:** skill-scanner.md

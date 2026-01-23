@@ -88,7 +88,7 @@ pub fn get_config_path() -> PathBuf {
 
 /// Returns the path to the Sikil cache database.
 ///
-/// The cache database is typically at `~/.sikil/cache.sqlite`.
+/// The cache database is typically at `~/.sikil/cache.json`.
 ///
 /// # Returns
 ///
@@ -100,12 +100,12 @@ pub fn get_config_path() -> PathBuf {
 /// use sikil::utils::paths::get_cache_path;
 ///
 /// let cache_path = get_cache_path();
-/// assert!(cache_path.ends_with(".sikil/cache.sqlite"));
+/// assert!(cache_path.ends_with(".sikil/cache.json"));
 /// ```
 pub fn get_cache_path() -> PathBuf {
     let user_dirs = directories::UserDirs::new().expect("Unable to determine home directory");
     let home = user_dirs.home_dir();
-    home.join(".sikil").join("cache.sqlite")
+    home.join(".sikil").join("cache.json")
 }
 
 /// Ensures a directory exists, creating it and any parent directories if necessary.
@@ -198,7 +198,7 @@ mod tests {
         let user_dirs = directories::UserDirs::new().expect("Unable to determine home directory");
         let home = user_dirs.home_dir();
         assert!(cache_path.starts_with(home));
-        assert!(cache_path.ends_with(".sikil/cache.sqlite"));
+        assert!(cache_path.ends_with(".sikil/cache.json"));
     }
 
     #[test]
