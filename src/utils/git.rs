@@ -280,7 +280,10 @@ fn parse_short_form(input: &str) -> Result<ParsedGitUrl, SikilError> {
 /// ```
 pub fn clone_repo(url: &ParsedGitUrl, dest: &Path) -> Result<(), SikilError> {
     // M3-E02-T02-S06: Check if git is installed
-    let git_check = Command::new("git").arg("--version").output();
+    let git_check = Command::new("git")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .arg("--version")
+        .output();
 
     match git_check {
         Ok(output) if output.status.success() => {
@@ -298,6 +301,7 @@ pub fn clone_repo(url: &ParsedGitUrl, dest: &Path) -> Result<(), SikilError> {
     // M3-E02-T02-S04: Use -c protocol.file.allow=never to block file protocol
     // M3-E02-T02-S05: Use --depth=1 for shallow clone
     let output = Command::new("git")
+        .env("GIT_TERMINAL_PROMPT", "0")
         .arg("clone")
         .arg("-c")
         .arg("protocol.file.allow=never")
@@ -773,46 +777,6 @@ mod tests {
     // M3-E02-T02-S04: Use -c protocol.file.allow=never to block file protocol
     // M3-E02-T02-S05: Use --depth=1 for shallow clone
     // M3-E02-T02-S06: Check git is installed, error if not
-
-    #[test]
-    fn test_clone_repo_checks_git_installed() {
-        // This test verifies the structure - we can't actually test without git
-        // But we can verify the function compiles and has the right signature
-        let url = ParsedGitUrl::new(
-            "https://github.com/owner/repo.git".to_string(),
-            "owner".to_string(),
-            "repo".to_string(),
-            None,
-        );
-
-        // We can't actually clone in tests, but we can verify the command structure
-        // by checking that calling it doesn't cause a compile error
-        // The actual git check will happen at runtime
-        let temp_dir = std::env::temp_dir();
-        let dest = temp_dir.join("test-sikil-clone");
-
-        // Just verify the function exists and can be called
-        // It will fail if git is not installed, which is expected
-        let result = clone_repo(&url, &dest);
-
-        // Either it succeeds (git is installed) or fails with GitError (git not installed)
-        // Both are acceptable outcomes for this test
-        match result {
-            Ok(()) => {
-                // Clean up on success
-                let _ = std::fs::remove_dir_all(dest);
-            }
-            Err(SikilError::GitError { .. }) => {
-                // Git not installed, expected in some environments
-            }
-            Err(e) => {
-                // Other errors might indicate network issues, etc.
-                // We just want to make sure the function runs
-                let _ = e;
-            }
-        }
-    }
-
     #[test]
     fn test_clone_repo_array_args_no_shell() {
         // Code review verification: This test documents the security properties
