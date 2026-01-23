@@ -148,7 +148,9 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
                     output.print_info(&format!("  - {} (scans {})", agent_name, path));
                 }
                 output.print_info("");
-                output.print_info("To enable an agent, run: sikil config set agents.<agent>.enabled true");
+                output.print_info(
+                    "To enable an agent, run: sikil config set agents.<agent>.enabled true",
+                );
             }
         }
         return Ok(());
