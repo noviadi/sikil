@@ -51,7 +51,7 @@ This produces optimized, small binaries (~10MB target).
 |-------|---------|---------|
 | `clap` | 4 | CLI argument parsing |
 | `serde` + `serde_yaml` + `serde_json` | 1, 0.9, 1 | Serialization (SKILL.md, config, JSON output) |
-| `rusqlite` | 0.31 (bundled) | SQLite cache for skill metadata |
+| `serde_json` | 1 | JSON cache for skill metadata |
 | `fs-err` | 2 | Filesystem operations with better errors |
 | `tempfile` | 3 | Temporary directories for atomic operations |
 | `walkdir` | 2 | Directory traversal |

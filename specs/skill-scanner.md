@@ -90,7 +90,7 @@ All errors are non-fatal; the scanner processes all accessible paths and returns
 |------------|---------|
 | `Config` | Provides agent paths (global/workspace) and enabled status |
 | `parse_skill_md` | Parses SKILL.md frontmatter into `SkillMetadata` |
-| `SqliteCache` | Optional caching layer for scan results (mtime/hash invalidation) |
+| `Cache` | Optional JSON file cache for scan results (SKILL.md mtime invalidation) |
 | `symlink::is_symlink` | Detects symlinks without following them |
 | `symlink::read_symlink_target` | Reads raw symlink target path |
 | `symlink::resolve_realpath` | Canonicalizes symlink to absolute path |
