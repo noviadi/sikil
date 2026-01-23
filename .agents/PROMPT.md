@@ -6,8 +6,8 @@ Follow `AGENTS.md` for build commands, validation, and codebase patterns.
 
 ## Workflow
 
-1. Read `IMPLEMENTATION_PLAN.md`, pick one uncompleted task
-2. Read the linked spec in `specs/` thoroughly
+1. Study specs/*.md using subagents. Give extra thoroughness on linked spec
+2. Read `IMPLEMENTATION_PLAN.md`, pick one uncompleted task
 3. **Write tests first** for the task's Acceptance Criteria
 4. Run tests — confirm they fail for the right reason (red), not compile errors
 5. Implement until tests pass (green)

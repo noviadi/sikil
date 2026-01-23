@@ -61,4 +61,4 @@ When writing tests first, create minimal stubs (`todo!()`, `unimplemented!()`) s
 
 ## Source of Truth
 
-`specs/*.md` — Source of truth for behavior/requirements. Workflow docs (`AGENTS.md`, `docs/`) govern process.
+`specs/*.md` — Source of truth for behavior/requirements. DO NOT read what's inside `docs/` as it might contain stale/incomplete documents.
