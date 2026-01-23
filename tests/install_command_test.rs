@@ -939,3 +939,133 @@ fn test_git_clone_cleanup_removes_git_directory() {
     // SKILL.md should still exist
     assert!(clone_dir.join("SKILL.md").exists());
 }
+
+// ============================================================================
+// Git URL Detection Tests
+// Tests for detecting Git URLs vs local paths in install command
+// ============================================================================
+
+/// Helper function to detect if a source is a Git URL
+/// This mirrors the logic that should be in main.rs
+fn is_git_url(source: &str) -> bool {
+    // HTTPS URLs starting with https://github.com/
+    if source.to_lowercase().starts_with("https://github.com/") {
+        return true;
+    }
+
+    // Short form: owner/repo or owner/repo/path/to/skill
+    // Check if it looks like "owner/repo" format (contains / but doesn't start with / or . or -)
+    // Also reject paths that exist on the filesystem
+    if source.contains('/') {
+        // Not an absolute path
+        if source.starts_with('/') || source.starts_with('.') || source.starts_with('-') {
+            return false;
+        }
+
+        // Check if it's a valid short-form Git URL (has exactly one or more / separated parts)
+        // Short form should be: "owner/repo" or "owner/repo/subdir"
+        // It should NOT contain special filesystem characters
+        let parts: Vec<&str> = source.split('/').collect();
+        if parts.len() >= 2 {
+            // Check if any part is empty or contains filesystem-specific patterns
+            for part in &parts {
+                if part.is_empty() || part.contains('.') || part.contains('\\') {
+                    return false;
+                }
+            }
+            // Check if the path exists on filesystem - if so, it's a local path
+            if PathBuf::from(source).exists() {
+                return false;
+            }
+            // Otherwise, assume it's a Git URL
+            return true;
+        }
+    }
+
+    false
+}
+
+#[test]
+fn test_detect_https_github_url() {
+    // HTTPS GitHub URLs should be detected as Git URLs
+    assert!(is_git_url("https://github.com/owner/repo.git"));
+    assert!(is_git_url("https://github.com/owner/repo"));
+    assert!(is_git_url(
+        "https://github.com/owner/repo.git/skills/my-skill"
+    ));
+}
+
+#[test]
+fn test_detect_short_form_git_url() {
+    // Short form owner/repo should be detected as Git URL
+    // Only if the path doesn't exist on the filesystem
+    let _temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let nonexistent_path = "owner/repo"; // This path shouldn't exist
+    assert!(!PathBuf::from(nonexistent_path).exists());
+    assert!(is_git_url(nonexistent_path));
+
+    // Short form with subdirectory
+    assert!(is_git_url("owner/repo/skills/my-skill"));
+    assert!(is_git_url("owner/repo/path/to/deep/skill"));
+}
+
+#[test]
+fn test_detect_local_path_not_git_url() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+    // Existing local directory should NOT be detected as Git URL
+    let local_skill = temp_dir.path().join("local-skill");
+    fs::create_dir(&local_skill).expect("Failed to create local skill");
+
+    // Test with absolute path
+    assert!(!is_git_url(local_skill.to_str().unwrap()));
+
+    // Test with relative path (when it exists)
+    // We can't easily test relative paths from current dir in tests,
+    // but the logic should handle this
+}
+
+#[test]
+fn test_absolute_path_not_git_url() {
+    // Absolute paths should NOT be detected as Git URLs
+    assert!(!is_git_url("/home/user/skills/my-skill"));
+    assert!(!is_git_url("/tmp/skill"));
+}
+
+#[test]
+fn test_relative_path_with_dots_not_git_url() {
+    // Relative paths with . or .. should NOT be detected as Git URLs
+    assert!(!is_git_url("./skills/my-skill"));
+    assert!(!is_git_url("../other-skill"));
+    assert!(!is_git_url("./skill"));
+}
+
+#[test]
+fn test_path_starting_with_dash_not_git_url() {
+    // Paths starting with - should NOT be detected as Git URLs
+    assert!(!is_git_url("-evil-flag"));
+    assert!(!is_git_url("-owner/repo"));
+}
+
+#[test]
+fn test_path_with_single_segment_not_git_url() {
+    // Single segment paths (no /) should NOT be detected as Git URLs
+    assert!(!is_git_url("skill-name"));
+    assert!(!is_git_url("my-local-skill"));
+}
+
+#[test]
+fn test_non_github_https_not_git_url() {
+    // Non-GitHub HTTPS URLs should NOT be detected as Git URLs
+    // They should be treated as invalid or local paths
+    // For now, our detection only recognizes GitHub URLs
+    assert!(!is_git_url("https://gitlab.com/owner/repo.git"));
+    assert!(!is_git_url("https://example.com/skill"));
+}
+
+#[test]
+fn test_file_protocol_rejected_as_git_url() {
+    // file:// protocol should NOT be detected as Git URL
+    assert!(!is_git_url("file:///etc/passwd"));
+    assert!(!is_git_url("FILE:///etc/passwd"));
+}

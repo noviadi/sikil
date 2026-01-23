@@ -1,9 +1,9 @@
 use clap::Parser;
 use sikil::cli::Cli;
 use sikil::commands::{
-    execute_adopt, execute_completions, execute_config, execute_install_local, execute_list,
-    execute_remove, execute_show, execute_sync, execute_unmanage, execute_validate, AdoptArgs,
-    CompletionsArgs, ConfigArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs, SyncArgs,
+    execute_adopt, execute_completions, execute_config, execute_install_git, execute_install_local,
+    execute_list, execute_remove, execute_show, execute_sync, execute_unmanage, execute_validate,
+    AdoptArgs, CompletionsArgs, ConfigArgs, InstallArgs, ListArgs, RemoveArgs, ShowArgs, SyncArgs,
     UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
@@ -20,6 +20,55 @@ fn get_exit_code(err: &anyhow::Error) -> i32 {
     } else {
         1 // Default exit code for non-SikilError errors
     }
+}
+
+/// Detects if the given source string is a Git URL or a local path.
+///
+/// Returns `true` if the source appears to be a Git URL, `false` if it's a local path.
+///
+/// Git URL formats:
+/// - HTTPS: `https://github.com/owner/repo.git` or `https://github.com/owner/repo`
+/// - Short form: `owner/repo` or `owner/repo/path/to/skill`
+///
+/// Local path indicators:
+/// - Absolute paths starting with `/`
+/// - Relative paths starting with `.` or `..`
+/// - Paths starting with `-` (argument injection protection)
+/// - Paths that exist on the filesystem
+/// - Single-segment paths (e.g., `my-skill`)
+fn is_git_url(source: &str) -> bool {
+    // HTTPS URLs starting with https://github.com/
+    if source.to_lowercase().starts_with("https://github.com/") {
+        return true;
+    }
+
+    // Short form: owner/repo or owner/repo/path/to/skill
+    // Check if it looks like "owner/repo" format (contains / but doesn't start with / or . or -)
+    if source.contains('/') {
+        // Not an absolute path or relative path with dots
+        if source.starts_with('/') || source.starts_with('.') || source.starts_with('-') {
+            return false;
+        }
+
+        // Check if it's a valid short-form Git URL (has at least 2 / separated parts)
+        let parts: Vec<&str> = source.split('/').collect();
+        if parts.len() >= 2 {
+            // Check if any part is empty or contains filesystem-specific patterns
+            for part in &parts {
+                if part.is_empty() || part.contains('.') || part.contains('\\') {
+                    return false;
+                }
+            }
+            // Check if the path exists on filesystem - if so, it's a local path
+            if std::path::PathBuf::from(source).exists() {
+                return false;
+            }
+            // Otherwise, assume it's a Git URL
+            return true;
+        }
+    }
+
+    false
 }
 
 fn main() {
@@ -98,15 +147,33 @@ fn main() {
         }
         sikil::cli::Commands::Install { source, r#to } => {
             // M3-E01-T04: Wire Install Command to CLI
-            // For now, only local paths are supported (Git install will be M3-E02)
-            let args = InstallArgs {
-                json_mode: cli.json,
-                path: source,
-                to,
-            };
-            if let Err(e) = execute_install_local(args, &config) {
-                eprintln!("Error: {}", e);
-                std::process::exit(get_exit_code(&e));
+            // M3-E02-T06: Wire Git URL detection to install command
+            // Detect if source is a Git URL or local path and dispatch accordingly
+            if is_git_url(&source) {
+                // Parse agents for Git install
+                let agents = if let Some(to_value) = &to {
+                    // Convert --to flag value to vector of agent names
+                    to_value.split(',').map(|s| s.trim().to_string()).collect()
+                } else {
+                    // No --to specified, will use all enabled agents in execute_install_git
+                    Vec::new()
+                };
+
+                if let Err(e) = execute_install_git(&source, agents, &config, cli.json) {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(get_exit_code(&e));
+                }
+            } else {
+                // Local path install
+                let args = InstallArgs {
+                    json_mode: cli.json,
+                    path: source,
+                    to,
+                };
+                if let Err(e) = execute_install_local(args, &config) {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(get_exit_code(&e));
+                }
             }
         }
         sikil::cli::Commands::Validate { path } => {
@@ -200,5 +267,63 @@ fn main() {
                 std::process::exit(get_exit_code(&e));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_git_url_https_github() {
+        assert!(is_git_url("https://github.com/owner/repo.git"));
+        assert!(is_git_url("https://github.com/owner/repo"));
+        assert!(is_git_url(
+            "https://github.com/owner/repo.git/skills/my-skill"
+        ));
+    }
+
+    #[test]
+    fn test_is_git_url_short_form() {
+        assert!(is_git_url("owner/repo"));
+        assert!(is_git_url("owner/repo/skills/my-skill"));
+        assert!(is_git_url("owner/repo/path/to/deep/skill"));
+    }
+
+    #[test]
+    fn test_is_git_url_absolute_path_false() {
+        assert!(!is_git_url("/home/user/skills/my-skill"));
+        assert!(!is_git_url("/tmp/skill"));
+    }
+
+    #[test]
+    fn test_is_git_url_relative_with_dots_false() {
+        assert!(!is_git_url("./skills/my-skill"));
+        assert!(!is_git_url("../other-skill"));
+        assert!(!is_git_url("./skill"));
+    }
+
+    #[test]
+    fn test_is_git_url_starting_with_dash_false() {
+        assert!(!is_git_url("-evil-flag"));
+        assert!(!is_git_url("-owner/repo"));
+    }
+
+    #[test]
+    fn test_is_git_url_single_segment_false() {
+        assert!(!is_git_url("skill-name"));
+        assert!(!is_git_url("my-local-skill"));
+    }
+
+    #[test]
+    fn test_is_git_url_non_github_https_false() {
+        assert!(!is_git_url("https://gitlab.com/owner/repo.git"));
+        assert!(!is_git_url("https://example.com/skill"));
+    }
+
+    #[test]
+    fn test_is_git_url_file_protocol_false() {
+        assert!(!is_git_url("file:///etc/passwd"));
+        assert!(!is_git_url("FILE:///etc/passwd"));
     }
 }

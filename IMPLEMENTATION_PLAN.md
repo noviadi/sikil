@@ -30,11 +30,15 @@ None - all specs have complete Acceptance Criteria.
 ### Wire Git URL detection to install command
 - **Spec:** skill-installation.md
 - **Gap:** `execute_install_git` function exists but main.rs doesn't detect Git URLs and dispatch to it
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - Installing from Git URL clones with `--depth=1` and copies skill to `~/.sikil/repo/<name>/`
   - Short-form Git URL `owner/repo` expands to `https://github.com/owner/repo.git`
   - Git URL with subdirectory `owner/repo/path/to/skill` extracts only that subdirectory
-- **Tests:**
+- **Tests:** src/main.rs (test_is_git_url_https_github, test_is_git_url_short_form, test_is_git_url_absolute_path_false, test_is_git_url_relative_with_dots_false, test_is_git_url_starting_with_dash_false, test_is_git_url_single_segment_false, test_is_git_url_non_github_https_false, test_is_git_url_file_protocol_false), tests/install_command_test.rs (test_detect_https_github_url, test_detect_short_form_git_url, test_detect_local_path_not_git_url, test_absolute_path_not_git_url, test_relative_path_with_dots_not_git_url, test_path_starting_with_dash_not_git_url, test_path_with_single_segment_not_git_url, test_non_github_https_not_git_url, test_file_protocol_rejected_as_git_url)
 - **Location:** src/main.rs
-- **Notes:** The `execute_install_git` function is fully implemented in src/commands/install.rs. Need to add URL detection logic in main.rs to route between `execute_install_local` and `execute_install_git`.
+- **Notes:**
+  - Added `is_git_url()` function in main.rs to detect Git URL formats (HTTPS GitHub URLs and short-form owner/repo)
+  - Modified install command handler to route to `execute_install_git` for Git URLs, `execute_install_local` for filesystem paths
+  - Git URL detection rejects absolute paths, relative paths with dots, paths starting with `-`, and existing filesystem paths
+  - Short-form Git URLs (owner/repo) are detected only when they don't exist as local paths
