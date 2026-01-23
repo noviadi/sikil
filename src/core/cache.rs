@@ -53,10 +53,10 @@ pub struct ScanEntry {
     /// Absolute path to the directory that was scanned
     pub path: PathBuf,
 
-    /// Last modification time of the directory (for invalidation)
+    /// Last modification time of SKILL.md (for invalidation)
     pub mtime: u64,
 
-    /// Size of the directory in bytes (for fast invalidation)
+    /// Size of SKILL.md in bytes (for fast invalidation)
     pub size: u64,
 
     /// Hash of the directory contents (for content-based invalidation)
@@ -213,8 +213,6 @@ impl JsonCache {
             reason: format!("failed to write cache temp file: {}", e),
         })?;
 
-        // Remove the target file first if it exists (for Windows compatibility)
-        let _ = fs::remove_file(&self.cache_path);
         fs::rename(&temp_path, &self.cache_path).map_err(|e| SikilError::ConfigError {
             reason: format!("failed to rename cache file: {}", e),
         })?;
