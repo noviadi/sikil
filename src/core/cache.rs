@@ -78,7 +78,6 @@ struct CacheFile {
     /// Cache format version
     version: u32,
     /// Path-keyed cache entries (absolute path strings)
-    #[serde(flatten)]
     entries: BTreeMap<String, CachedEntry>,
 }
 
@@ -592,7 +591,7 @@ mod tests {
         cache.put(&entry).unwrap();
 
         // Manually write a cache file with wrong version
-        let wrong_version = r#"{"version": 999, "/test/skill": {"mtime": 1234567890, "size": 1024, "content_hash": "abc123", "cached_at": 1234567890, "skill_name": null, "is_valid_skill": true}}"#;
+        let wrong_version = r#"{"version": 999, "entries": {"/test/skill": {"mtime": 1234567890, "size": 1024, "content_hash": "abc123", "cached_at": 1234567890, "skill_name": null, "is_valid_skill": true}}}"#;
         fs::write(&cache_path, wrong_version).unwrap();
 
         // Load should return None due to version mismatch
