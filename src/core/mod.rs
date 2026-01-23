@@ -8,7 +8,7 @@ pub mod parser;
 pub mod scanner;
 pub mod skill;
 
-pub use cache::{Cache, ScanEntry, SqliteCache};
+pub use cache::{Cache, JsonCache, ScanEntry};
 pub use config::{AgentConfig, Config};
 pub use conflicts::{
     detect_conflicts, filter_error_conflicts, Conflict, ConflictLocation, ConflictType,

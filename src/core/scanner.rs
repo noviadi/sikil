@@ -4,7 +4,7 @@
 //! Agent Skills, which are identified by the presence of SKILL.md files
 //! in subdirectories.
 
-use crate::core::cache::{Cache, ScanEntry, SqliteCache};
+use crate::core::cache::{Cache, JsonCache, ScanEntry};
 use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
@@ -236,7 +236,7 @@ pub struct Scanner {
     /// Configuration for agent paths
     config: Config,
     /// Optional cache for storing scan results
-    cache: Option<SqliteCache>,
+    cache: Option<JsonCache>,
     /// Whether to use the cache (can be disabled via --no-cache)
     use_cache: bool,
     /// Optional workspace root override (for testing; uses env::current_dir() if None)
@@ -250,7 +250,7 @@ impl Scanner {
     pub fn new(config: Config) -> Self {
         Self {
             config,
-            cache: SqliteCache::open().ok(),
+            cache: JsonCache::open().ok(),
             use_cache: true,
             workspace_root: None,
             repo_root: None,
@@ -260,7 +260,7 @@ impl Scanner {
     /// Creates a new Scanner with cache control
     pub fn with_cache(config: Config, use_cache: bool) -> Self {
         let cache = if use_cache {
-            SqliteCache::open().ok()
+            JsonCache::open().ok()
         } else {
             None
         };

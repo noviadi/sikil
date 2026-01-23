@@ -7,17 +7,20 @@
 use crate::core::SikilError;
 use crate::utils::paths::{ensure_dir_exists, get_cache_path};
 use fs_err as fs;
-use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// Current schema version for the cache database.
-/// Increment this when the schema changes to trigger migration/recreation.
-const SCHEMA_VERSION: u32 = 1;
+/// Cache file format version.
+/// Increment this when the format changes to trigger full cache clear.
+const CACHE_VERSION: u32 = 1;
 
 /// Maximum size of content hash to store (SHA256 = 64 hex chars)
 const MAX_HASH_SIZE: usize = 64;
+
+/// Maximum cache file size (15 MB) - exceeding triggers full clear
+const MAX_CACHE_SIZE: u64 = 15 * 1024 * 1024;
 
 /// Trait defining cache operations for skill scan results.
 pub trait Cache {
@@ -69,25 +72,83 @@ pub struct ScanEntry {
     pub is_valid_skill: bool,
 }
 
-/// SQLite-based cache implementation.
-pub struct SqliteCache {
-    conn: Connection,
+/// JSON cache file structure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CacheFile {
+    /// Cache format version
+    version: u32,
+    /// Path-keyed cache entries (absolute path strings)
+    #[serde(flatten)]
+    entries: BTreeMap<String, CachedEntry>,
 }
 
-impl SqliteCache {
-    /// Open or create the cache database at the default location.
-    ///
-    /// Creates the database file and parent directories if they don't exist.
-    /// Initializes schema or migrates if version mismatch.
+/// Entry stored in JSON cache (path is the key, not in the struct)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CachedEntry {
+    /// Last modification time of SKILL.md (unix seconds)
+    mtime: u64,
+    /// Size of SKILL.md in bytes
+    size: u64,
+    /// SHA256 hash of SKILL.md content
+    content_hash: String,
+    /// Timestamp when entry was cached (unix seconds)
+    cached_at: u64,
+    /// Parsed skill name from SKILL.md
+    skill_name: Option<String>,
+    /// Whether the path contains a valid skill
+    is_valid_skill: bool,
+}
+
+impl From<&ScanEntry> for CachedEntry {
+    fn from(entry: &ScanEntry) -> Self {
+        Self {
+            mtime: entry.mtime,
+            size: entry.size,
+            content_hash: entry.content_hash.clone(),
+            cached_at: entry.cached_at,
+            skill_name: entry.skill_name.clone(),
+            is_valid_skill: entry.is_valid_skill,
+        }
+    }
+}
+
+impl CachedEntry {
+    fn to_scan_entry(&self, path: PathBuf) -> ScanEntry {
+        ScanEntry {
+            path,
+            mtime: self.mtime,
+            size: self.size,
+            content_hash: self.content_hash.clone(),
+            cached_at: self.cached_at,
+            skill_name: self.skill_name.clone(),
+            is_valid_skill: self.is_valid_skill,
+        }
+    }
+}
+
+impl CacheFile {
+    /// Create a new empty cache file with current version.
+    fn new() -> Self {
+        Self {
+            version: CACHE_VERSION,
+            entries: BTreeMap::new(),
+        }
+    }
+}
+
+/// JSON-based cache implementation.
+pub struct JsonCache {
+    cache_path: PathBuf,
+}
+
+impl JsonCache {
+    /// Open or create the cache file at the default location.
     pub fn open() -> Result<Self, SikilError> {
         let cache_path = get_cache_path();
         Self::open_at(&cache_path)
     }
 
-    /// Open or create the cache database at a specific path.
-    ///
-    /// Creates the database file and parent directories if they don't exist.
-    /// Initializes schema or migrates if version mismatch.
+    /// Open or create the cache file at a specific path.
     pub fn open_at(path: &Path) -> Result<Self, SikilError> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
@@ -96,94 +157,57 @@ impl SqliteCache {
             })?;
         }
 
-        let conn = Connection::open(path).map_err(|e| SikilError::ConfigError {
-            reason: format!("failed to open cache database: {}", e),
-        })?;
-
-        // Enable WAL mode for better concurrent access
-        conn.query_row("PRAGMA journal_mode=WAL", [], |_row| Ok(()))
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to enable WAL mode: {}", e),
-            })?;
-
-        let mut cache = Self { conn };
-
-        // Check and run migrations if needed
-        cache.migrate()?;
-
-        Ok(cache)
+        Ok(Self {
+            cache_path: path.to_path_buf(),
+        })
     }
 
-    /// Initialize the database schema.
-    fn init_schema(&self) -> Result<(), SikilError> {
-        self.conn
-            .execute(
-                "CREATE TABLE IF NOT EXISTS scan_cache (
-                    path TEXT PRIMARY KEY,
-                    mtime INTEGER NOT NULL,
-                    size INTEGER NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    cached_at INTEGER NOT NULL,
-                    skill_name TEXT,
-                    is_valid_skill INTEGER NOT NULL
-                )",
-                [],
-            )
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to create cache table: {}", e),
-            })?;
-
-        self.conn
-            .execute(
-                "CREATE INDEX IF NOT EXISTS idx_skill_name ON scan_cache(skill_name)",
-                [],
-            )
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to create index: {}", e),
-            })?;
-
-        // Set schema version
-        self.conn
-            .execute("PRAGMA user_version = 1", [])
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to set schema version: {}", e),
-            })?;
-
-        Ok(())
-    }
-
-    /// Check schema version and migrate if needed.
-    ///
-    /// For now, we simply recreate the database if the version doesn't match.
-    /// Future versions will implement proper migrations.
-    fn migrate(&mut self) -> Result<(), SikilError> {
-        let version: u32 = self
-            .conn
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to read schema version: {}", e),
-            })?;
-
-        if version == 0 {
-            self.init_schema()?;
-        } else if version != SCHEMA_VERSION {
-            // Schema version mismatch - recreate the database
-            self.conn
-                .execute("DROP TABLE IF EXISTS scan_cache", [])
-                .map_err(|e| SikilError::ConfigError {
-                    reason: format!("failed to drop old schema: {}", e),
-                })?;
-            self.init_schema()?;
+    /// Load the cache file, returning None if it doesn't exist or on error.
+    fn load(&self) -> Option<CacheFile> {
+        // Check file size first
+        let metadata = fs::metadata(&self.cache_path).ok()?;
+        if metadata.len() > MAX_CACHE_SIZE {
+            // Cache file too large - trigger clear on next write
+            return None;
         }
 
+        let content = fs::read_to_string(&self.cache_path).ok()?;
+        let cache_file: CacheFile = serde_json::from_str(&content).ok()?;
+
+        // Check version
+        if cache_file.version != CACHE_VERSION {
+            return None;
+        }
+
+        Some(cache_file)
+    }
+
+    /// Write cache file atomically (temp file + rename).
+    fn write(&self, cache_file: &CacheFile) -> Result<(), SikilError> {
+        let temp_path = self.cache_path.with_extension("tmp");
+        let json =
+            serde_json::to_string_pretty(cache_file).map_err(|e| SikilError::ConfigError {
+                reason: format!("failed to serialize cache: {}", e),
+            })?;
+
+        fs::write(&temp_path, json).map_err(|e| SikilError::ConfigError {
+            reason: format!("failed to write cache temp file: {}", e),
+        })?;
+
+        fs::rename(&temp_path, &self.cache_path).map_err(|e| SikilError::ConfigError {
+            reason: format!("failed to rename cache file: {}", e),
+        })?;
+
         Ok(())
     }
 
-    /// Get the current mtime for a path.
-    fn get_path_mtime(path: &Path) -> Result<u64, SikilError> {
-        let metadata = fs::metadata(path).map_err(|_e| SikilError::DirectoryNotFound {
-            path: path.to_path_buf(),
-        })?;
+    /// Get the mtime for a SKILL.md file at the given path.
+    fn get_skill_mtime(path: &Path) -> Result<u64, SikilError> {
+        let skill_md_path = path.join("SKILL.md");
+        let metadata =
+            fs::metadata(&skill_md_path).map_err(|_e| SikilError::DirectoryNotFound {
+                path: path.to_path_buf(),
+            })?;
 
         let modified = metadata.modified().map_err(|_| SikilError::ConfigError {
             reason: format!("unable to get mtime for {}", path.display()),
@@ -198,109 +222,44 @@ impl SqliteCache {
 
         Ok(duration_since_epoch.as_secs())
     }
-
-    /// Get the current timestamp as unix seconds.
-    #[cfg(test)]
-    fn now() -> u64 {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    }
-
-    /// Get a cached entry without mtime validation (for testing only).
-    #[cfg(test)]
-    fn get_raw(&self, path: &Path) -> Result<Option<ScanEntry>, SikilError> {
-        let path_str = path.to_str().ok_or_else(|| SikilError::ConfigError {
-            reason: format!("invalid path: {}", path.display()),
-        })?;
-
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT path, mtime, size, content_hash, cached_at, skill_name, is_valid_skill
-                 FROM scan_cache WHERE path = ?",
-            )
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to prepare get_raw query: {}", e),
-            })?;
-
-        let entry = stmt
-            .query_row(params![path_str], |row| {
-                Ok(ScanEntry {
-                    path: PathBuf::from(row.get::<_, String>(0)?),
-                    mtime: row.get(1)?,
-                    size: row.get(2)?,
-                    content_hash: row.get(3)?,
-                    cached_at: row.get(4)?,
-                    skill_name: row.get(5)?,
-                    is_valid_skill: row.get::<_, i64>(6)? != 0,
-                })
-            })
-            .optional()
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to query cache: {}", e),
-            })?;
-
-        Ok(entry)
-    }
 }
 
-impl Cache for SqliteCache {
+impl Cache for JsonCache {
     fn get(&self, path: &Path) -> Result<Option<ScanEntry>, SikilError> {
         let path_str = path.to_str().ok_or_else(|| SikilError::ConfigError {
             reason: format!("invalid path: {}", path.display()),
         })?;
 
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT path, mtime, size, content_hash, cached_at, skill_name, is_valid_skill
-                 FROM scan_cache WHERE path = ?",
-            )
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to prepare get query: {}", e),
-            })?;
+        // Load cache file (non-fatal if it fails)
+        let cache_file = match self.load() {
+            Some(file) => file,
+            None => return Ok(None),
+        };
 
-        let entry = stmt
-            .query_row(params![path_str], |row| {
-                Ok(ScanEntry {
-                    path: PathBuf::from(row.get::<_, String>(0)?),
-                    mtime: row.get(1)?,
-                    size: row.get(2)?,
-                    content_hash: row.get(3)?,
-                    cached_at: row.get(4)?,
-                    skill_name: row.get(5)?,
-                    is_valid_skill: row.get::<_, i64>(6)? != 0,
-                })
-            })
-            .optional()
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to query cache: {}", e),
-            })?;
+        // Look up entry
+        let cached_entry = match cache_file.entries.get(path_str) {
+            Some(entry) => entry,
+            None => return Ok(None),
+        };
 
-        // Check if entry is still valid by comparing mtime and size
-        if let Some(ref entry) = entry {
-            // Try to get current metadata
-            if let Ok(current_mtime) = Self::get_path_mtime(path) {
-                if current_mtime != entry.mtime {
-                    // Path has been modified, return None to trigger rescan
+        // Check if SKILL.md still exists and mtime matches
+        match Self::get_skill_mtime(path) {
+            Ok(current_mtime) => {
+                if current_mtime != cached_entry.mtime {
+                    // SKILL.md has been modified, return None to trigger rescan
                     return Ok(None);
                 }
-            } else {
-                // Path no longer exists
+            }
+            Err(_) => {
+                // SKILL.md no longer exists
                 return Ok(None);
             }
         }
 
-        Ok(entry)
+        Ok(Some(cached_entry.to_scan_entry(path.to_path_buf())))
     }
 
     fn put(&self, entry: &ScanEntry) -> Result<(), SikilError> {
-        let path_str = entry.path.to_str().ok_or_else(|| SikilError::ConfigError {
-            reason: format!("invalid path: {}", entry.path.display()),
-        })?;
-
         // Validate content hash length
         if entry.content_hash.len() > MAX_HASH_SIZE {
             return Err(SikilError::ValidationError {
@@ -308,25 +267,20 @@ impl Cache for SqliteCache {
             });
         }
 
-        self.conn
-            .execute(
-                "INSERT OR REPLACE INTO scan_cache
-                 (path, mtime, size, content_hash, cached_at, skill_name, is_valid_skill)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
-                    path_str,
-                    entry.mtime,
-                    entry.size,
-                    entry.content_hash,
-                    entry.cached_at,
-                    entry.skill_name,
-                    entry.is_valid_skill as i64,
-                ],
-            )
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to insert cache entry: {}", e),
-            })?;
+        let path_str = entry.path.to_str().ok_or_else(|| SikilError::ConfigError {
+            reason: format!("invalid path: {}", entry.path.display()),
+        })?;
 
+        // Load existing cache or create new
+        let mut cache_file = self.load().unwrap_or_else(CacheFile::new);
+
+        // Insert/replace entry
+        cache_file
+            .entries
+            .insert(path_str.to_string(), CachedEntry::from(entry));
+
+        // Write (non-fatal on failure)
+        let _ = self.write(&cache_file);
         Ok(())
     }
 
@@ -335,61 +289,50 @@ impl Cache for SqliteCache {
             reason: format!("invalid path: {}", path.display()),
         })?;
 
-        self.conn
-            .execute("DELETE FROM scan_cache WHERE path = ?", params![path_str])
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to invalidate cache entry: {}", e),
-            })?;
+        // Load existing cache or create new
+        let mut cache_file = self.load().unwrap_or_else(CacheFile::new);
 
+        // Remove entry
+        cache_file.entries.remove(path_str);
+
+        // Write (non-fatal on failure)
+        let _ = self.write(&cache_file);
         Ok(())
     }
 
     fn clean_stale(&self) -> Result<usize, SikilError> {
-        // Get all cached paths
-        let mut stmt = self
-            .conn
-            .prepare("SELECT path FROM scan_cache")
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to prepare clean_stale query: {}", e),
-            })?;
-
-        let paths: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to query cache paths: {}", e),
-            })?
-            .collect::<Result<_, _>>()
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to read cache path: {}", e),
-            })?;
+        // Load existing cache or return 0 if doesn't exist
+        let mut cache_file = match self.load() {
+            Some(file) => file,
+            None => return Ok(0),
+        };
 
         let mut stale_count = 0;
+        let mut stale_paths = Vec::new();
 
-        for path_str in paths {
-            let path = PathBuf::from(&path_str);
-
-            // Check if path still exists
-            if !path.exists() {
-                self.conn
-                    .execute("DELETE FROM scan_cache WHERE path = ?", params![path_str])
-                    .map_err(|e| SikilError::ConfigError {
-                        reason: format!("failed to delete stale entry: {}", e),
-                    })?;
-
+        // Find stale entries
+        for path_str in cache_file.entries.keys() {
+            let path = PathBuf::from(path_str);
+            let skill_md_path = path.join("SKILL.md");
+            if !skill_md_path.exists() {
+                stale_paths.push(path_str.clone());
                 stale_count += 1;
             }
         }
 
+        // Remove stale entries
+        for path_str in stale_paths {
+            cache_file.entries.remove(&path_str);
+        }
+
+        // Write (non-fatal on failure)
+        let _ = self.write(&cache_file);
         Ok(stale_count)
     }
 
     fn clear(&self) -> Result<(), SikilError> {
-        self.conn
-            .execute("DELETE FROM scan_cache", [])
-            .map_err(|e| SikilError::ConfigError {
-                reason: format!("failed to clear cache: {}", e),
-            })?;
-
+        let cache_file = CacheFile::new();
+        let _ = self.write(&cache_file);
         Ok(())
     }
 }
@@ -397,267 +340,219 @@ impl Cache for SqliteCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
-    /// Helper to create a temporary cache for testing
-    fn create_temp_cache() -> Result<SqliteCache, SikilError> {
-        let temp_file = NamedTempFile::new().unwrap();
-        let temp_path = temp_file.into_temp_path();
-        SqliteCache::open_at(&temp_path)
+    /// Helper to create a ScanEntry for testing
+    fn create_test_entry(path: &str, mtime: u64) -> ScanEntry {
+        ScanEntry {
+            path: PathBuf::from(path),
+            mtime,
+            size: 1024,
+            content_hash: "abc123".to_string(),
+            cached_at: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+            skill_name: Some("test-skill".to_string()),
+            is_valid_skill: true,
+        }
     }
 
     #[test]
-    fn test_sqlite_cache_open_creates_schema() {
-        let cache = create_temp_cache().unwrap();
-
-        // Verify table exists
-        let table_exists: i64 = cache
-            .conn
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='scan_cache'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-
-        assert_eq!(table_exists, 1);
-
-        // Verify schema version
-        let version: u32 = cache
-            .conn
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .unwrap();
-
-        assert_eq!(version, SCHEMA_VERSION);
+    fn test_json_cache_open_creates_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        assert!(!cache.cache_path.exists()); // No file created yet
     }
 
     #[test]
     fn test_cache_put_and_get() {
-        let cache = create_temp_cache().unwrap();
-
-        let entry = ScanEntry {
-            path: PathBuf::from("/test/skill"),
-            mtime: 1234567890,
-            size: 1024,
-            content_hash: "abc123".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("test-skill".to_string()),
-            is_valid_skill: true,
-        };
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
 
         // Put entry
         cache.put(&entry).unwrap();
 
-        // Get entry (using get_raw since test path doesn't exist)
-        let retrieved = cache.get_raw(&PathBuf::from("/test/skill")).unwrap();
-        assert!(retrieved.is_some());
-        let retrieved = retrieved.unwrap();
+        // Verify cache file was created
+        assert!(cache.cache_path.exists());
 
-        assert_eq!(retrieved.path, PathBuf::from("/test/skill"));
-        assert_eq!(retrieved.mtime, 1234567890);
-        assert_eq!(retrieved.size, 1024);
-        assert_eq!(retrieved.content_hash, "abc123");
-        assert_eq!(retrieved.skill_name, Some("test-skill".to_string()));
-        assert!(retrieved.is_valid_skill);
+        // Get entry - will return None because SKILL.md doesn't exist for mtime check
+        // But we can verify the put worked by checking the file exists
+        let loaded = cache.load().unwrap();
+        assert!(loaded.entries.contains_key("/test/skill"));
     }
 
     #[test]
     fn test_cache_get_returns_none_for_nonexistent() {
-        let cache = create_temp_cache().unwrap();
-
-        // Using get_raw to test cache lookup without mtime validation
-        let result = cache.get_raw(&PathBuf::from("/nonexistent/path")).unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        // Using load() directly to test cache lookup without mtime validation
+        let result = cache.load();
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_cache_invalidate() {
-        let cache = create_temp_cache().unwrap();
-
-        let entry = ScanEntry {
-            path: PathBuf::from("/test/skill"),
-            mtime: 1234567890,
-            size: 1024,
-            content_hash: "abc123".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("test-skill".to_string()),
-            is_valid_skill: true,
-        };
+    fn test_cache_put_creates_valid_json() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
 
         cache.put(&entry).unwrap();
-        assert!(cache
-            .get_raw(&PathBuf::from("/test/skill"))
-            .unwrap()
-            .is_some());
+
+        // Load and verify JSON structure
+        let loaded = cache.load().unwrap();
+        assert_eq!(loaded.version, CACHE_VERSION);
+        assert!(loaded.entries.contains_key("/test/skill"));
+
+        let cached = &loaded.entries["/test/skill"];
+        assert_eq!(cached.mtime, 1234567890);
+        assert_eq!(cached.size, 1024);
+        assert_eq!(cached.content_hash, "abc123");
+        assert_eq!(cached.skill_name, Some("test-skill".to_string()));
+        assert!(cached.is_valid_skill);
+    }
+
+    #[test]
+    fn test_cache_invalidate() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
+
+        cache.put(&entry).unwrap();
+        assert!(cache.load().unwrap().entries.contains_key("/test/skill"));
 
         cache.invalidate(&PathBuf::from("/test/skill")).unwrap();
-        assert!(cache
-            .get_raw(&PathBuf::from("/test/skill"))
-            .unwrap()
-            .is_none());
+        assert!(!cache.load().unwrap().entries.contains_key("/test/skill"));
     }
 
     #[test]
     fn test_cache_clear() {
-        let cache = create_temp_cache().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
 
         // Add multiple entries
         for i in 0..5 {
-            let entry = ScanEntry {
-                path: PathBuf::from(format!("/test/skill{}", i)),
-                mtime: 1234567890 + i as u64,
-                size: 1024,
-                content_hash: format!("hash{}", i),
-                cached_at: SqliteCache::now(),
-                skill_name: Some(format!("skill{}", i)),
-                is_valid_skill: true,
-            };
+            let entry = create_test_entry(&format!("/test/skill{}", i), 1234567890 + i as u64);
             cache.put(&entry).unwrap();
         }
 
-        // Verify entries exist (using get_raw)
-        assert!(cache
-            .get_raw(&PathBuf::from("/test/skill0"))
-            .unwrap()
-            .is_some());
+        // Verify entries exist
+        let loaded = cache.load().unwrap();
+        assert_eq!(loaded.entries.len(), 5);
 
         // Clear all
         cache.clear().unwrap();
 
         // Verify all entries are gone
-        for i in 0..5 {
-            let result = cache
-                .get_raw(&PathBuf::from(format!("/test/skill{}", i)))
-                .unwrap();
-            assert!(result.is_none());
-        }
+        let loaded = cache.load().unwrap();
+        assert_eq!(loaded.entries.len(), 0);
     }
 
     #[test]
     fn test_cache_clean_stale() {
-        let cache = create_temp_cache().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
 
-        // Create a temporary directory that will exist
-        let temp_dir = std::env::temp_dir().join("sikil_test_clean_stale");
-        fs::create_dir_all(&temp_dir).ok();
+        // Create a temp directory with SKILL.md (will exist)
+        let skill_dir = temp_dir.path().join("existing-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        let skill_md_path = skill_dir.join("SKILL.md");
+        fs::write(&skill_md_path, "# Test").unwrap();
 
         // Add entry for existing path
         let existing_entry = ScanEntry {
-            path: temp_dir.clone(),
+            path: skill_dir.clone(),
             mtime: 1234567890,
             size: 1024,
             content_hash: "existing".to_string(),
-            cached_at: SqliteCache::now(),
+            cached_at: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
             skill_name: Some("existing-skill".to_string()),
             is_valid_skill: true,
         };
+        cache.put(&existing_entry).unwrap();
 
         // Add entry for non-existent path
-        let stale_entry = ScanEntry {
-            path: PathBuf::from("/nonexistent/path/that/does/not/exist"),
-            mtime: 1234567890,
-            size: 1024,
-            content_hash: "stale".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("stale-skill".to_string()),
-            is_valid_skill: true,
-        };
-
-        cache.put(&existing_entry).unwrap();
+        let stale_entry = create_test_entry("/nonexistent/path/that/does/not/exist", 1234567890);
         cache.put(&stale_entry).unwrap();
 
         // Clean stale entries
         let removed = cache.clean_stale().unwrap();
         assert_eq!(removed, 1);
 
-        // Verify stale entry is removed (using get_raw)
-        assert!(cache
-            .get_raw(&PathBuf::from("/nonexistent/path/that/does/not/exist"))
-            .unwrap()
-            .is_none());
+        // Verify stale entry is removed
+        let loaded = cache.load().unwrap();
+        assert!(!loaded
+            .entries
+            .contains_key("/nonexistent/path/that/does/not/exist"));
 
-        // Verify existing entry is still there (using get_raw)
-        assert!(cache.get_raw(&temp_dir).unwrap().is_some());
-
-        // Clean up
-        fs::remove_dir_all(temp_dir).ok();
+        // Verify existing entry is still there
+        assert!(loaded
+            .entries
+            .contains_key(&skill_dir.to_string_lossy().to_string()));
     }
 
     #[test]
     fn test_cache_replace_existing_entry() {
-        let cache = create_temp_cache().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
 
-        let entry1 = ScanEntry {
-            path: PathBuf::from("/test/skill"),
-            mtime: 1234567890,
-            size: 1024,
-            content_hash: "hash1".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("skill-v1".to_string()),
-            is_valid_skill: true,
-        };
-
-        let entry2 = ScanEntry {
-            path: PathBuf::from("/test/skill"),
-            mtime: 1234567891,
-            size: 2048,
-            content_hash: "hash2".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("skill-v2".to_string()),
-            is_valid_skill: false,
-        };
+        let entry1 = create_test_entry("/test/skill", 1234567890);
+        let mut entry2 = create_test_entry("/test/skill", 1234567891);
+        entry2.size = 2048;
+        entry2.content_hash = "hash2".to_string();
+        entry2.skill_name = Some("skill-v2".to_string());
+        entry2.is_valid_skill = false;
 
         cache.put(&entry1).unwrap();
         cache.put(&entry2).unwrap();
 
-        let retrieved = cache
-            .get_raw(&PathBuf::from("/test/skill"))
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved.mtime, 1234567891);
-        assert_eq!(retrieved.size, 2048);
-        assert_eq!(retrieved.content_hash, "hash2");
-        assert_eq!(retrieved.skill_name, Some("skill-v2".to_string()));
-        assert!(!retrieved.is_valid_skill);
+        let loaded = cache.load().unwrap();
+        let cached = &loaded.entries["/test/skill"];
+        assert_eq!(cached.mtime, 1234567891);
+        assert_eq!(cached.size, 2048);
+        assert_eq!(cached.content_hash, "hash2");
+        assert_eq!(cached.skill_name, Some("skill-v2".to_string()));
+        assert!(!cached.is_valid_skill);
     }
 
     #[test]
     fn test_cache_entry_with_none_skill_name() {
-        let cache = create_temp_cache().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
 
-        let entry = ScanEntry {
-            path: PathBuf::from("/test/invalid"),
-            mtime: 1234567890,
-            size: 512,
-            content_hash: "no-skill".to_string(),
-            cached_at: SqliteCache::now(),
-            skill_name: None,
-            is_valid_skill: false,
-        };
+        let mut entry = create_test_entry("/test/invalid", 1234567890);
+        entry.skill_name = None;
+        entry.is_valid_skill = false;
 
         cache.put(&entry).unwrap();
 
-        let retrieved = cache
-            .get_raw(&PathBuf::from("/test/invalid"))
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved.skill_name, None);
-        assert!(!retrieved.is_valid_skill);
+        let loaded = cache.load().unwrap();
+        let cached = &loaded.entries["/test/invalid"];
+        assert_eq!(cached.skill_name, None);
+        assert!(!cached.is_valid_skill);
     }
 
     #[test]
     fn test_cache_put_rejects_oversized_hash() {
-        let cache = create_temp_cache().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
 
-        let entry = ScanEntry {
-            path: PathBuf::from("/test/skill"),
-            mtime: 1234567890,
-            size: 1024,
-            content_hash: "a".repeat(MAX_HASH_SIZE + 1),
-            cached_at: SqliteCache::now(),
-            skill_name: Some("test-skill".to_string()),
-            is_valid_skill: true,
-        };
+        let mut entry = create_test_entry("/test/skill", 1234567890);
+        entry.content_hash = "a".repeat(MAX_HASH_SIZE + 1);
 
         let result = cache.put(&entry);
         assert!(result.is_err());
@@ -667,5 +562,143 @@ mod tests {
         } else {
             panic!("Expected ValidationError");
         }
+    }
+
+    #[test]
+    fn test_cache_version_mismatch_clears_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
+
+        cache.put(&entry).unwrap();
+
+        // Manually write a cache file with wrong version
+        let wrong_version = r#"{"version": 999, "/test/skill": {"mtime": 1234567890, "size": 1024, "content_hash": "abc123", "cached_at": 1234567890, "skill_name": null, "is_valid_skill": true}}"#;
+        fs::write(&cache_path, wrong_version).unwrap();
+
+        // Load should return None due to version mismatch
+        assert!(cache.load().is_none());
+    }
+
+    #[test]
+    fn test_cache_size_limit_clears_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
+
+        cache.put(&entry).unwrap();
+
+        // Manually create a cache file that exceeds size limit
+        let huge_content = format!(
+            r#"{{"version": 1, "entries": {{"/test/skill": {{"mtime": 1234567890, "size": 1024, "content_hash": "{}", "cached_at": 1234567890, "skill_name": null, "is_valid_skill": true}}}}}}"#,
+            "a".repeat(MAX_CACHE_SIZE as usize)
+        );
+        fs::write(&cache_path, huge_content).unwrap();
+
+        // Load should return None due to size limit
+        assert!(cache.load().is_none());
+    }
+
+    #[test]
+    fn test_cache_write_uses_atomic_temp_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
+
+        cache.put(&entry).unwrap();
+
+        // Verify temp file was cleaned up (should not exist)
+        let temp_path = cache_path.with_extension("tmp");
+        assert!(!temp_path.exists());
+
+        // Verify final cache file exists
+        assert!(cache_path.exists());
+    }
+
+    #[test]
+    fn test_cache_put_with_max_hash_size_succeeds() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+
+        let mut entry = create_test_entry("/test/skill", 1234567890);
+        entry.content_hash = "a".repeat(MAX_HASH_SIZE);
+
+        let result = cache.put(&entry);
+        assert!(result.is_ok());
+
+        let loaded = cache.load().unwrap();
+        let cached = &loaded.entries["/test/skill"];
+        assert_eq!(cached.content_hash.len(), MAX_HASH_SIZE);
+    }
+
+    #[test]
+    fn test_cache_entries_use_btreemap_for_determinism() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+
+        // Add entries in non-alphabetical order
+        cache.put(&create_test_entry("/test/z", 1)).unwrap();
+        cache.put(&create_test_entry("/test/a", 2)).unwrap();
+        cache.put(&create_test_entry("/test/m", 3)).unwrap();
+
+        // Load and verify keys are sorted
+        let loaded = cache.load().unwrap();
+        let keys: Vec<&String> = loaded.entries.keys().collect();
+        assert_eq!(keys, vec!["/test/a", "/test/m", "/test/z"]);
+    }
+
+    #[test]
+    fn test_cache_get_returns_none_when_mtime_mismatch() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+
+        // Create a real temp directory with SKILL.md
+        let skill_dir = temp_dir.path().join("test-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        let skill_md_path = skill_dir.join("SKILL.md");
+        fs::write(&skill_md_path, "# Test").unwrap();
+
+        // Get actual mtime
+        let actual_mtime = JsonCache::get_skill_mtime(&skill_dir).unwrap();
+
+        // Cache entry with wrong mtime
+        let entry = ScanEntry {
+            path: skill_dir.clone(),
+            mtime: actual_mtime - 1000, // Wrong mtime
+            size: 1024,
+            content_hash: "abc123".to_string(),
+            cached_at: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+            skill_name: Some("test-skill".to_string()),
+            is_valid_skill: true,
+        };
+        cache.put(&entry).unwrap();
+
+        // get() should return None due to mtime mismatch
+        let result = cache.get(&skill_dir).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_cache_file_pretty_printed() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_path = temp_dir.path().join("cache.json");
+        let cache = JsonCache::open_at(&cache_path).unwrap();
+        let entry = create_test_entry("/test/skill", 1234567890);
+
+        cache.put(&entry).unwrap();
+
+        // Read the file and verify it's pretty-printed (contains newlines)
+        let content = fs::read_to_string(&cache_path).unwrap();
+        assert!(content.contains('\n'));
+        assert!(content.contains("  ")); // Indentation
     }
 }
