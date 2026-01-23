@@ -117,6 +117,31 @@ Parsing flow:
 4. Validation of required fields after parsing
 5. Name validation via `validate_skill_name()`
 
+## Acceptance Criteria
+
+- `SkillMetadata::new("my-skill", "desc")` creates metadata with name and description
+- `SkillMetadata` with `None` version/author/license serializes without those fields
+- `Skill::is_orphan()` returns `true` when `installations` is empty
+- `Skill::is_orphan()` returns `false` when at least one installation exists
+- `Skill::with_repo(path)` sets `is_managed` to `true` and `repo_path` to `Some(path)`
+- `Agent::all()` returns slice containing all 5 agent variants
+- `Agent::cli_name()` returns `"claude-code"` for `Agent::ClaudeCode`
+- `Agent::from_cli_name("amp")` returns `Some(Agent::Amp)`
+- `Agent::from_cli_name("invalid")` returns `None`
+- `Scope::Global` serializes to `"global"`
+- `Scope::Workspace` serializes to `"workspace"`
+- Skill name `"my-skill"` passes validation
+- Skill name `"my_skill_123"` passes validation
+- Empty skill name returns validation error
+- Skill name starting with `-` returns validation error
+- Skill name with uppercase letters returns validation error
+- Skill name longer than 64 characters returns validation error
+- Skill name `"."` or `".."` returns validation error
+- Skill name containing `/` or `\` returns validation error
+- SKILL.md without `---` frontmatter markers returns `InvalidSkillMd` error
+- SKILL.md missing required `name` field returns `InvalidSkillMd` error
+- SKILL.md missing required `description` field returns `InvalidSkillMd` error
+
 ## Dependencies
 
 | Dependency | Usage |

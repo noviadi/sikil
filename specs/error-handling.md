@@ -72,6 +72,28 @@ The CLI layer (`main.rs`) additionally provides help for common cases:
 eprintln!("Valid agents: {}", Agent::all().iter().map(|a| a.cli_name()).collect::<Vec<_>>().join(", "));
 ```
 
+## Acceptance Criteria
+
+- `SikilError::InvalidSkillMd` displays `"Invalid SKILL.md in {path}: {reason}"`
+- `SikilError::SkillNotFound` displays `"Skill not found: {name}"`
+- `SikilError::DirectoryNotFound` displays `"Directory not found: {path}"`
+- `SikilError::SymlinkError` displays `"Symlink error: {reason}"`
+- `SikilError::GitError` displays `"Git error: {reason}"`
+- `SikilError::ConfigError` displays `"Configuration error: {reason}"`
+- `SikilError::AlreadyExists` displays `"Already exists: {resource}"`
+- `SikilError::PermissionDenied` displays `"Permission denied: {operation} on {path}"`
+- `SikilError::ValidationError` displays `"Validation failed: {reason}"`
+- `SikilError::PathTraversal` displays `"Path traversal detected: {path}"`
+- `SikilError::SymlinkNotAllowed` displays `"Symlink not allowed: {reason}"`
+- `SikilError::InvalidGitUrl` displays `"Invalid Git URL: {url} - {reason}"`
+- `SikilError::ConfigTooLarge` displays `"Configuration file too large: {size} bytes (maximum 1048576 bytes)"`
+- `ConfigError::FileRead` displays `"Failed to read config file: {0}"`
+- `ConfigError::InvalidToml` displays `"Invalid TOML in config: {0}"`
+- `ConfigError::ConfigTooLarge` displays `"Configuration file too large: {0} bytes (maximum 1048576 bytes)"`
+- `SikilError::SymlinkError` with `source: Some(io_err)` chains to underlying `io::Error`
+- CLI prints `"Error: {message}"` to stderr on error
+- CLI exits with code 1 on any error
+
 ## Dependencies
 
 - `thiserror` crate for derive macros

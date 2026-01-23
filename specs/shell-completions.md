@@ -35,6 +35,16 @@ Any other shell identifier returns an error with the message: `Unsupported shell
 | No `--output` flag | Completions written to stdout |
 | `--output <PATH>` | Completions written to file at PATH, confirmation printed to stderr |
 
+## Acceptance Criteria
+
+- `sikil completions bash` outputs valid Bash completion script to stdout
+- `sikil completions zsh` outputs valid Zsh completion script to stdout
+- `sikil completions fish` outputs valid Fish completion script to stdout
+- Shell argument matching is case-insensitive (`BASH`, `Bash`, `bash` all work)
+- Unsupported shell returns error: `Unsupported shell '<name>'. Supported shells: bash, zsh, fish`
+- `--output <PATH>` writes completion script to file instead of stdout
+- `--output <PATH>` prints confirmation message to stderr
+
 ## Installation Instructions
 
 **Bash:**

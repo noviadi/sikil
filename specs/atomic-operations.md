@@ -26,6 +26,19 @@ The atomic module provides safe, atomic filesystem operations for managing skill
 - Cross-filesystem moves back up existing destination, restore on failure
 - `safe_remove_dir` requires explicit confirmation to prevent accidental deletions
 
+## Acceptance Criteria
+
+- `copy_skill_dir` deep copies all files and subdirectories from source to destination
+- `copy_skill_dir` excludes `.git` directory from the copy
+- `copy_skill_dir` returns `SikilError::SymlinkNotAllowed` if source contains symlinks
+- `copy_skill_dir` returns `SikilError::DirectoryNotFound` if source doesn't exist
+- `copy_skill_dir` rolls back (removes partial copy) on failure
+- `atomic_move_dir` uses `fs::rename` for same-filesystem moves
+- `atomic_move_dir` falls back to copy+delete for cross-filesystem moves
+- `atomic_move_dir` restores existing destination on failure during cross-filesystem move
+- `safe_remove_dir` returns `SikilError::ValidationError` if `confirmed=false`
+- `safe_remove_dir` removes directory and all contents if `confirmed=true`
+
 ## Error Handling
 
 All functions return `Result<T, SikilError>` with:

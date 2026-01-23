@@ -28,6 +28,20 @@ The symlink module provides utilities for creating, reading, and resolving symbo
 - `is_managed_symlink` returns false for broken symlinks
 - `read_symlink_target` returns error if path is not a symlink
 
+## Acceptance Criteria
+
+- `create_symlink` creates parent directories if missing
+- `create_symlink` removes existing file at destination before creating symlink
+- `create_symlink` removes existing symlink at destination before creating new symlink
+- `is_symlink` returns true for symbolic links
+- `is_symlink` returns false for regular files and directories
+- `read_symlink_target` returns the immediate target path without resolving chains
+- `read_symlink_target` returns `SikilError::SymlinkError` if path is not a symlink
+- `resolve_realpath` follows all symlinks and returns canonical absolute path
+- `is_managed_symlink` returns true if symlink target is under `~/.sikil/repo/`
+- `is_managed_symlink` returns false for broken symlinks
+- `is_managed_symlink` returns false if symlink target is outside `~/.sikil/repo/`
+
 ## Error Handling
 
 All functions return `Result<T, SikilError>` with:

@@ -66,6 +66,22 @@ Additional internal operations:
 - `open()` / `open_at(path)`: Opens or creates the database, runs migrations
 - `migrate()`: Checks schema version, recreates table if version mismatch
 
+## Acceptance Criteria
+
+- `get(path)` returns cached entry when mtime matches filesystem mtime
+- `get(path)` returns `None` when mtime differs from cached mtime
+- `get(path)` returns `None` when path no longer exists on filesystem
+- `put(entry)` inserts new entry with path as primary key
+- `put(entry)` replaces existing entry when path matches
+- `put(entry)` rejects content hash exceeding 64 characters
+- `invalidate(path)` removes entry for the specified path
+- `clean_stale()` removes all entries for non-existent paths
+- `clean_stale()` returns count of removed entries
+- `clear()` removes all entries from cache
+- Schema version change triggers table drop and recreation
+- `--no-cache` flag bypasses cache for scan operations
+- Cache database is created at `~/.sikil/cache.sqlite`
+
 ## Dependencies
 
 - `rusqlite`: SQLite database driver

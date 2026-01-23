@@ -71,6 +71,23 @@ The `copy_dir_recursive()` helper copies files, directories, and symlinks.
 - Rejects absolute paths
 - Canonicalizes and verifies subdirectory is within clone root
 
+## Acceptance Criteria
+
+- `parse_git_url` expands `owner/repo` to `https://github.com/owner/repo.git`
+- `parse_git_url` extracts subdirectory from `owner/repo/path/to/skill`
+- `parse_git_url` returns `SikilError::InvalidGitUrl` for non-GitHub URLs
+- `parse_git_url` returns `SikilError::InvalidGitUrl` for `file://` protocol
+- `parse_git_url` returns `SikilError::InvalidGitUrl` for URLs with whitespace or NUL
+- `parse_git_url` returns `SikilError::InvalidGitUrl` for URLs starting with `-`
+- `clone_repo` returns `SikilError::GitError` if git is not installed
+- `clone_repo` uses `--depth=1` for shallow clone
+- `clone_repo` uses `--` separator before URL to prevent option injection
+- `clone_repo` uses `-c protocol.file.allow=never` to block file:// protocol
+- `extract_subdirectory` returns `SikilError::PathTraversal` for paths containing `..`
+- `extract_subdirectory` returns `SikilError::PathTraversal` for absolute paths
+- `extract_subdirectory` returns `SikilError::DirectoryNotFound` if subdirectory doesn't exist
+- `extract_subdirectory` copies subdirectory to temporary directory and returns its path
+
 ## Error Handling
 
 | Error Type | Trigger |

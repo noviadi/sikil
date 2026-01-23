@@ -92,6 +92,20 @@ if let Err(e) = execute_command(args, &config) {
 }
 ```
 
+## Acceptance Criteria
+
+- `sikil --version` prints version string and exits with code 0
+- `sikil --help` prints usage information and exits with code 0
+- `sikil -v -q` exits with non-zero code due to mutual exclusivity
+- `--json` flag is available on all subcommands (global option)
+- Unknown subcommand prints error to stderr and exits with non-zero code
+- Missing required argument prints error with usage hint to stderr
+- Validation error exits with code 2
+- Skill not found error exits with code 3
+- Permission error exits with code 4
+- Network error exits with code 5
+- All error messages are written to stderr
+
 ## Dependencies
 
 - `clap` - argument parsing with derive macros

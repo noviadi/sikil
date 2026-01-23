@@ -104,6 +104,21 @@ impl Progress {
 | `abandon_with_message` | Abort with message |
 | `clear` | Remove progress indicator |
 
+## Acceptance Criteria
+
+- `print_success` outputs green text with ✓ icon when colors enabled
+- `print_warning` outputs yellow text with ⚠ icon when colors enabled
+- `print_error` outputs red text with ✗ icon when colors enabled
+- `NO_COLOR` environment variable (any value) disables all colors but keeps Unicode icons
+- In JSON mode, `print_json` writes to stdout
+- In JSON mode, `print_success`, `print_warning`, `print_error`, and `print_info` write to stderr
+- In normal mode, messages write to stdout and errors write to stderr
+- Progress indicator is disabled when stdout is not a TTY
+- Progress indicator is disabled in JSON mode
+- `MessageWriter` routes to stderr in JSON mode, stdout otherwise
+- `Progress::new` with `total: Some(n)` creates a progress bar
+- `Progress::new` with `total: None` creates a spinner
+
 ## Dependencies
 
 - `anstream` / `anstyle` - colored terminal output

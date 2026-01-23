@@ -48,6 +48,19 @@ The sync command links managed skills from the central repository to agent skill
 
 Not supported. The implementation has no `--dry-run` flag in `SyncArgs`.
 
+## Acceptance Criteria
+
+- `sikil sync <name>` creates symlinks for the named skill in all target agents
+- `sikil sync --all` syncs every managed skill in the repository
+- Default `--to` targets all enabled agents
+- Agents already having the skill (symlink exists) are skipped
+- Physical directory at agent path returns error suggesting `sikil adopt`
+- Skill not found in repository returns error
+- Skill missing `SKILL.md` returns validation error
+- Hidden directories (starting with `.`) are skipped when using `--all`
+- Agent skill directory is created if it doesn't exist
+- Neither skill name nor `--all` provided returns `ValidationError`
+
 ## Dependencies
 
 - `crate::core::config::Config` - Agent configuration and paths

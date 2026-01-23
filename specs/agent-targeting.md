@@ -87,6 +87,23 @@ When `--json` flag is active:
 
 This ensures non-interactive operation for scripting and automation.
 
+## Acceptance Criteria
+
+- `--to all` returns all enabled agents from config
+- `--to claude-code` returns single validated agent
+- `--to claude-code,amp` parses comma-separated list and returns all valid agents
+- Whitespace around agent names in comma-separated list is trimmed
+- Unknown agent name returns `ValidationError` with message listing valid agents
+- Disabled agent returns `ValidationError` with message "agent 'X' is disabled in configuration"
+- Empty selection returns `ValidationError` with "no valid agents specified"
+- No enabled agents in config returns `ValidationError` with "no enabled agents in configuration"
+- Interactive prompt displays numbered list of enabled agents with "a" for all
+- Interactive prompt accepts single number, comma-separated numbers, or "a"
+- Empty prompt input returns `ValidationError` with "no selection made"
+- Invalid number format returns `ValidationError` with "invalid selection format"
+- Out-of-range selection returns `ValidationError` with "invalid selection N"
+- JSON mode skips interactive prompt and defaults to all enabled agents
+
 ## Dependencies
 
 | Component | Location | Purpose |

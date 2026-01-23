@@ -114,3 +114,16 @@ Constructors:
 |----------|-------|
 | `src/commands/list.rs` | Detects conflicts and filters skills with `--conflicts` flag |
 | `src/main.rs` | CLI flag passthrough for conflicts filtering |
+
+## Acceptance Criteria
+
+- Multiple unmanaged installations with different paths create a `DuplicateUnmanaged` conflict
+- Multiple managed symlinks pointing to the same repo path create a `DuplicateManaged` conflict
+- `DuplicateUnmanaged` conflicts have `is_error()` returning `true`
+- `DuplicateManaged` conflicts have `is_error()` returning `false`
+- `filter_error_conflicts()` returns only `DuplicateUnmanaged` conflicts
+- `format_conflicts_summary()` returns "No conflicts detected" when no conflicts exist
+- `format_conflicts_summary()` returns "N errors, M info" format when conflicts exist
+- Conflict output shows `✗` indicator for error conflicts and `ℹ` for info conflicts
+- `recommendations()` returns resolution suggestions for unmanaged conflicts
+- Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with repo path

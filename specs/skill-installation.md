@@ -115,6 +115,25 @@ Implemented in `src/utils/symlink.rs`:
 
 **Rollback behavior:** On partial failure during symlink creation, all created symlinks are removed and the copied skill directory is deleted.
 
+## Acceptance Criteria
+
+- Installing from local path copies skill to `~/.sikil/repo/<name>/`
+- Installing from Git URL clones with `--depth=1` and copies skill to `~/.sikil/repo/<name>/`
+- Symlinks are created from each target agent's skill directory to the repo copy
+- Short-form Git URL `owner/repo` expands to `https://github.com/owner/repo.git`
+- Git URL with subdirectory `owner/repo/path/to/skill` extracts only that subdirectory
+- Source containing symlinks returns `SymlinkNotAllowed` error
+- Source path not found returns `DirectoryNotFound` error
+- Missing SKILL.md returns `InvalidSkillMd` error with "SKILL.md not found"
+- Skill already in repo returns `AlreadyExists` error with message "skill '<name>' in repository"
+- Destination already exists as directory returns `AlreadyExists` error suggesting `sikil adopt`
+- Destination already exists as symlink returns `AlreadyExists` error suggesting `sikil sync`
+- Git URL with `file://` protocol is rejected
+- Git URL starting with `-` is rejected
+- Subdirectory path containing `..` returns `PathTraversal` error
+- Partial failure during symlink creation removes all created symlinks and copied skill
+- `.git/` directory is removed from copied skills
+
 ## Dependencies
 
 | Component | Location | Purpose |

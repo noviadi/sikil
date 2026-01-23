@@ -79,6 +79,20 @@ match create_symlink(&dest_path, source_path) {
 }
 ```
 
+## Acceptance Criteria
+
+- Adopting a skill moves it from agent directory to `~/.sikil/repo/<name>/`
+- A symlink is created at the original location pointing to the repo copy
+- Skill with only one installation can be adopted without `--from` flag
+- Skill with multiple installations requires `--from` flag
+- Missing `--from` with multiple installations lists all locations in error message
+- Adopting a symlink (already managed skill) returns `ValidationError` with "already managed" message
+- Skill name already in repository returns `AlreadyExists` error
+- Unknown agent name in `--from` returns `ValidationError`
+- Skill not found in specified agent returns `ValidationError`
+- Cross-filesystem moves use copy+delete fallback
+- Symlink creation failure after move attempts rollback to restore original location
+
 ## Error Conditions
 
 | Error | Condition | Type |

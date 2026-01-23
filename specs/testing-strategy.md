@@ -257,6 +257,21 @@ Key practices:
 - Create minimal config files pointing to temp paths
 - Clean up is automatic when `TempDir` is dropped
 
+## Acceptance Criteria
+
+- Unit tests compile and run with `cargo test --lib`
+- Integration tests compile and run with `cargo test --test '*'`
+- `cargo test` runs all tests (unit + integration + e2e)
+- Test files in `tests/` follow `*_test.rs` naming convention
+- `sikil_cmd!` macro creates Command pointing to compiled binary
+- Fixtures in `tests/fixtures/skills/valid/` parse successfully
+- Fixtures in `tests/fixtures/skills/invalid/` return parse errors
+- Snapshots are stored in `src/core/snapshots/` and `tests/snapshots/`
+- Dynamic paths are redacted before snapshotting (e.g., `[SKILLS_DIR]`, `[HOME]`)
+- `cargo insta review` displays pending snapshot changes for approval
+- Tests using `TempDir` clean up automatically when dropped
+- `HOME` environment variable isolation prevents tests from affecting real config
+
 ## Dependencies
 
 - `tempfile` - Temporary directory management

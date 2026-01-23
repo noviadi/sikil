@@ -55,6 +55,21 @@ Uses an interactive confirmation prompt with `[y/N]` format.
 9. If `--all` and skill was managed:
    - Delete skill directory from repository using `safe_remove_dir()`
 
+## Acceptance Criteria
+
+- `--all` removes skill from all agents AND deletes from repository
+- `--agent` removes only from specified agents; repository entry is preserved
+- Both managed (symlinks) and unmanaged (directories) skills can be removed
+- Missing both `--agent` and `--all` returns `ValidationError`
+- Invalid agent name returns `ValidationError`
+- Skill not found returns `SkillNotFound` error
+- Confirmation prompt shows `[y/N]` format with default "no"
+- `--yes` flag skips confirmation prompt
+- `--json` mode skips confirmation prompt
+- Empty input at confirmation prompt cancels operation
+- User entering `n` or `N` cancels operation with `PermissionDenied` error
+- Orphaned repository entry after `--agent` removal triggers deletion prompt
+
 ## Error Conditions
 
 | Condition | Error Type |

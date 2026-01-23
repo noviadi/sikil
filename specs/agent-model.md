@@ -52,6 +52,24 @@ The `Scope` enum defines two installation scopes:
 - **Filtering**: `AgentConfig.enabled` controls whether an agent is included in operations
 - **Iteration**: `Agent::all()` provides all variants; config filtering uses `config.agents.values().filter(|a| a.enabled)`
 
+## Acceptance Criteria
+
+- `Agent::all()` returns exactly 5 variants: ClaudeCode, Windsurf, OpenCode, KiloCode, Amp
+- `Agent::from_cli_name("claude-code")` returns `Some(Agent::ClaudeCode)`
+- `Agent::from_cli_name("windsurf")` returns `Some(Agent::Windsurf)`
+- `Agent::from_cli_name("opencode")` returns `Some(Agent::OpenCode)`
+- `Agent::from_cli_name("kilocode")` returns `Some(Agent::KiloCode)`
+- `Agent::from_cli_name("amp")` returns `Some(Agent::Amp)`
+- `Agent::from_cli_name("unknown")` returns `None`
+- `Agent::ClaudeCode.cli_name()` returns `"claude-code"`
+- `Display` for `Agent::Amp` outputs `"amp"`
+- Default global path for claude-code expands `~/.claude/skills` to absolute path
+- Default workspace path for claude-code is `.claude/skills`
+- Path containing `~` expands to home directory
+- `AgentConfig` with `enabled: false` excludes agent from operations
+- `Scope::Global` serializes to `"global"`
+- `Scope::Workspace` serializes to `"workspace"`
+
 ## Dependencies
 
 - `serde`: Serialization with `rename_all = "kebab-case"` for Agent enum

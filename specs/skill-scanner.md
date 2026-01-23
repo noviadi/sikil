@@ -70,6 +70,20 @@ Classification uses `resolve_realpath()` to canonicalize the symlink target befo
 
 All errors are non-fatal; the scanner processes all accessible paths and returns a complete `ScanResult` with both discovered skills and accumulated errors.
 
+## Acceptance Criteria
+
+- Directories starting with `.` are skipped during scan
+- Symlinks pointing to `~/.sikil/repo/` are classified as managed
+- Symlinks pointing outside `~/.sikil/repo/` are classified as foreign symlinks
+- Non-existent symlink targets are classified as broken symlinks
+- Missing SKILL.md records error in `parse_errors` but continues scanning
+- Invalid SKILL.md content records error in `parse_errors` but continues scanning
+- Non-existent agent directories are silently skipped (no error returned)
+- Unreadable directory entries are skipped without stopping the scan
+- Scan iterates global paths before workspace paths for each agent
+- Duplicate skill names across directories are merged into a single skill with multiple installations
+- Physical directories (not symlinks) are classified as unmanaged
+
 ## Dependencies
 
 | Dependency | Purpose |

@@ -76,6 +76,22 @@ workspace_path = "<path>"
 - Post-edit validation ensures config remains parseable
 - Set command validates key format and field names
 
+## Acceptance Criteria
+
+- Missing config file returns `Config::default()` with all agents enabled
+- Existing config file is parsed and returned without merging with defaults
+- Config file exceeding 1MB returns `ConfigError::ConfigTooLarge`
+- Unknown TOML keys return `ConfigError::InvalidToml`
+- Tilde (`~`) in paths is expanded to home directory
+- `sikil config` displays `(default)` or `(custom)` markers for each setting
+- `sikil config --json` outputs configuration as valid JSON to stdout
+- `sikil config --edit` creates default config if file is missing
+- `sikil config --edit` opens `$EDITOR` (or `vi` if unset)
+- `sikil config --edit` validates config after editor closes
+- `sikil config --set agents.<agent>.enabled false` disables the specified agent
+- `sikil config --set` with invalid key format prints error and exits non-zero
+- `sikil config --set` creates config file with defaults before applying change if missing
+
 ## Dependencies
 
 - `toml` - TOML parsing and serialization

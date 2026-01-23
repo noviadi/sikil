@@ -146,6 +146,25 @@ PASSED
 | `Description is empty` | Empty description |
 | `Description is too long: N characters (max 1024)` | Description > 1024 chars |
 
+## Acceptance Criteria
+
+- Missing SKILL.md file returns error "SKILL.md file not found"
+- Missing `---` markers returns error "missing frontmatter delimiters"
+- Single `---` marker returns error "malformed frontmatter (only one '---' marker found)"
+- Content before first `---` returns error "frontmatter must be at the start of the file"
+- Missing `name` field returns error "missing required field 'name'"
+- Missing `description` field returns error "missing required field 'description'"
+- Skill name with uppercase letters fails pattern validation
+- Skill name containing `/` or `\` returns error "skill name cannot contain path separators"
+- Skill name `.` or `..` returns error "Path traversal detected"
+- Empty description returns error "Description is empty"
+- Description over 1024 characters returns error with character count
+- Missing optional fields (`version`, `author`, `license`) generate warnings, not errors
+- Blocking check failure stops further validation checks
+- `--json` flag outputs valid JSON matching the documented structure
+- Skill name input (not path) resolves to installed skill location via Scanner
+- Validation detects presence of `scripts/` and `references/` directories
+
 ## Dependencies
 
 - `src/core/parser.rs`: `extract_frontmatter`, `parse_skill_md`, `validate_skill_name`

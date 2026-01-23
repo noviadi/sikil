@@ -159,3 +159,20 @@ The list command displays:
 - CLI parser routes `sikil show <name>` to `execute_show()`
 - Both commands share the `Scanner` for skill discovery
 - Output structs are designed for scripting/automation via `--json`
+
+## Acceptance Criteria
+
+- `sikil list` displays skills sorted alphabetically within managed and unmanaged groups
+- `sikil list --agent claude-code` returns only skills installed for claude-code agent
+- `sikil list --managed` returns only skills with managed installations
+- `sikil list --unmanaged` returns only skills without managed installations
+- `sikil list --conflicts` returns only skills with detected conflicts
+- `sikil list --json` outputs valid JSON array matching the documented structure
+- `sikil show <name>` returns `SkillNotFound` error when skill does not exist
+- `sikil show <name> --json` outputs valid JSON object matching the documented structure
+- `sikil show` excludes `.git` directory from file count and size calculations
+- `sikil list` with no skills and no filters displays disabled default agent warning
+- `sikil list --json` with no skills does not display disabled agent warning
+- `--no-cache` flag forces fresh scan bypassing cached results
+- Description column in list output is truncated to 50 characters
+- Directory name is shown when it differs from SKILL.md `name` field

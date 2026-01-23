@@ -157,6 +157,20 @@ curl -L https://github.com/noviadi/sikil/releases/latest/download/sikil-x86_64-u
 sudo mv sikil /usr/local/bin/
 ```
 
+## Acceptance Criteria
+
+- `cargo build` compiles successfully with Rust 1.75+
+- `cargo build --release` produces binary under 10MB
+- Release build generates `sikil.1` man page in project root
+- `SIKIL_GENERATE_MAN=1 cargo build` generates man page during debug builds
+- Binary runs on macOS x86_64 (`x86_64-apple-darwin`) target
+- Binary runs on macOS aarch64 (`aarch64-apple-darwin`) target
+- Binary runs on Linux x86_64 (`x86_64-unknown-linux-gnu`) target
+- Binary runs on Linux aarch64 (`aarch64-unknown-linux-gnu`) target
+- Build fails on Windows due to `std::os::unix::fs::symlink()` dependency
+- `git` CLI is available at runtime for `sikil install` command
+- `./scripts/build.sh <target>` cross-compiles and runs smoke test
+
 ## Dependencies
 
 - None (this is a foundational spec)

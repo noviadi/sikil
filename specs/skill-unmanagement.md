@@ -55,6 +55,22 @@ Uses an interactive confirmation prompt with `[y/N]` format.
 9. If all managed installations were unmanaged:
    - Delete skill from repository with `fs::remove_dir_all()`
 
+## Acceptance Criteria
+
+- Unmanaging replaces symlink with physical copy of skill content
+- Without `--agent`, all managed installations are unmanaged
+- With `--agent`, only that agent's installation is unmanaged
+- When all installations are unmanaged, repository entry is deleted
+- Unmanaging an unmanaged skill (not a symlink) returns `ValidationError`
+- Skill not found returns `SkillNotFound` error
+- Skill not in repository returns `ValidationError`
+- Invalid agent name returns `ValidationError`
+- Copy failure removes partial copy and restores original symlink
+- Confirmation prompt shows `[y/N]` format with default "no"
+- `--yes` flag skips confirmation prompt
+- `--json` mode skips confirmation prompt
+- User canceling confirmation returns `PermissionDenied` error
+
 ## Error Conditions
 
 | Condition | Error Type |
