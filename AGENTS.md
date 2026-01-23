@@ -63,9 +63,13 @@ Dependencies flow: `cli/` → `commands/` → `core/` → `utils/`
 
 ### Reference Documents
 
+**For agents**
+
 | Document | Purpose |
 |----------|---------|
-| `specs/PRD.md` | Product requirements |
-| `specs/TRD.md` | Technical specifications |
-| `specs/implementation_roadmap.md` | Task breakdown |
+| `specs/*.md` | Source of truth on how the cli works and implemented  |
 | `docs/coding-practices.md` | Detailed patterns |
+
+STRICTLY USE specs/*.md only as the source of truth. DO NOT refer to other document unless commanded explicitly.
+Whenever required, study the docs using subagents.
+

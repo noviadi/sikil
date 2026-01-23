@@ -2,8 +2,6 @@
 
 This document defines how to write specification documents for a software project. Specs serve as the **Single Source of Truth (SSOT)** for how each component works.
 
-> **Note:** Examples in this guide use a Rust CLI tool. Adapt terminology for your project type (web service, library, mobile app, etc.).
-
 ## Core Concepts
 
 ### Terminology
@@ -102,6 +100,10 @@ Every spec follows this template:
 
 [Pick from optional sections based on relevance]
 
+## Acceptance Criteria
+
+[Observable outcomes that indicate correct behavior - used for test derivation]
+
 ## Error Handling
 
 [What errors can occur and how they're handled]
@@ -178,6 +180,55 @@ Name sections based on content type:
 | Rules / Constraints | "[Topic] Rules" (e.g., "Validation Rules") |
 | Configuration | "Configuration Options" |
 | CLI flags | "Command Options" |
+| Verifiable outcomes | "Acceptance Criteria" |
+
+### Acceptance Criteria
+
+Acceptance criteria define **observable, verifiable outcomes** that indicate the component works correctly. They become the foundation for test requirements during plan construction.
+
+**Format requirements:**
+- Must be a **bullet list** (not paragraphs or prose)
+- Each bullet is one testable criterion
+- Tasks copy bullets verbatim - format consistency enables this
+
+**Guidelines:**
+- Focus on **behavior** (what happens), not **implementation** (how it's built)
+- Each criterion should be independently testable
+- Use concrete, measurable terms
+- Include an **observable** in each bullet (returns X, exits code Y, completes in Z seconds)
+
+**Good criteria:**
+```markdown
+## Acceptance Criteria
+
+- Scanning 1000 skill directories completes in under 2 seconds
+- Modified SKILL.md files invalidate their cache entries
+- `--no-cache` flag forces fresh scan regardless of cache state
+- Broken symlinks are reported in scan results, not silently skipped
+```
+
+**Bad criteria:**
+```markdown
+## Acceptance Criteria
+
+- Uses efficient data structures (implementation detail)
+- Code is well-organized (subjective)
+- Cache works properly (vague)
+- Is secure (no observable)
+- Handles errors gracefully (unmeasurable)
+```
+
+**Deriving criteria:**
+
+Acceptance criteria are required. When writing or updating a spec, derive them from:
+- Process steps that describe outcomes
+- Error handling behavior
+- API behavioral descriptions
+- Non-functional requirements (performance, security)
+
+Explicitly list the derived criteria in the Acceptance Criteria section.
+
+> **Note for planning/implementation agents:** Deriving criteria is part of **writing specs**. During gap analysis and implementation, you must **not** derive or invent acceptance criteria. Copy verbatim from the spec's AC section and report missing/incomplete AC as Spec Issues.
 
 ### Data Structure Documentation
 
@@ -495,6 +546,14 @@ Validates and normalizes an email address.
 - Local part: 1-64 characters
 - Domain: valid hostname format
 
+## Acceptance Criteria
+
+- Valid email "User@Example.COM" normalizes to "user@example.com"
+- Email with leading/trailing whitespace is accepted after trimming
+- Email exceeding 254 characters returns `TooLong` error
+- Email without `@` returns `InvalidFormat` error
+- Empty string returns `Empty` error
+
 ## Error Handling
 
 | Error | Cause |
@@ -666,15 +725,27 @@ This worker processes the email queue, sending messages through SendGrid. It imp
 
 Before finalizing a spec, verify:
 
-- [ ] One-sentence description passes "no and" test (for distinct concerns)
-- [ ] Overview is 2-3 sentences
-- [ ] Primary technical section matches component type
-- [ ] All public interfaces are documented
-- [ ] Error conditions are listed
-- [ ] Dependencies section is complete
-- [ ] Used By section references real components
+**Required sections:**
+- [ ] One-Sentence Description - passes "no and" test
+- [ ] Overview - 2-3 sentences
+- [ ] Primary technical section - matches component type
+- [ ] Acceptance Criteria - present and complete
+- [ ] Error Handling - all error cases listed
+- [ ] Dependencies - what this uses
+- [ ] Used By - what uses this
+
+**Acceptance Criteria quality:**
+- [ ] Formatted as bullet list (not prose)
+- [ ] Each bullet has one observable outcome
+- [ ] No implementation details (how to build)
+- [ ] No subjective terms (well-organized, clean, robust)
+- [ ] No vague outcomes (works properly, handles correctly)
+- [ ] Measurable where applicable (time, count, exit code)
+
+**Integration:**
 - [ ] File is added to SSOT index
 - [ ] Architecture mapping is updated
+- [ ] Cross-references to other specs are explicit
 
 ## Cross-Cutting Specs
 
