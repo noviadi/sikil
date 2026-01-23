@@ -45,6 +45,10 @@ else
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+tmpfile=""
+cleanup() { rm -f "$tmpfile"; }
+trap cleanup EXIT
+
 while true; do
     if [ $MAX_ITERATIONS -gt 0 ] && [ $ITERATION -ge $MAX_ITERATIONS ]; then
         echo "Reached max iterations: $MAX_ITERATIONS"
@@ -54,9 +58,8 @@ while true; do
     ITERATION=$((ITERATION + 1))
     echo -e "\n======================== ITERATION $ITERATION ========================\n"
 
-    # Temp file for raw output (cleanup on exit)
+    # Temp file for raw output (cleaned up at end of iteration or on exit)
     tmpfile=$(mktemp)
-    trap "rm -f $tmpfile" EXIT
 
     # Run Claude iteration with selected prompt
     # -p: Headless mode (non-interactive, reads from stdin)
@@ -82,6 +85,10 @@ while true; do
         }
     else
         echo "No new commits to push after $ITERATION iteration(s)"
+        cleanup
         break
     fi
+
+    # Clean up temp file before next iteration
+    cleanup
 done
