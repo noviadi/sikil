@@ -184,7 +184,26 @@ impl JsonCache {
 
     /// Write cache file atomically (temp file + rename).
     fn write(&self, cache_file: &CacheFile) -> Result<(), SikilError> {
-        let temp_path = self.cache_path.with_extension("tmp");
+        // Use a truly unique temp file name to avoid conflicts in concurrent scenarios
+        // Timestamp + random number ensures uniqueness
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| SikilError::ConfigError {
+                reason: "failed to get timestamp".to_string(),
+            })?
+            .as_nanos();
+        // Use a simple hash of thread ID as a fallback for uniqueness
+        let thread_hash = std::thread::current().id();
+        // Format thread ID as hex string
+        let thread_id_str = format!("{:?}", thread_hash);
+        let temp_path = format!(
+            "{}.{}.{}.tmp",
+            self.cache_path.display(),
+            thread_id_str,
+            timestamp
+        );
+        let temp_path = PathBuf::from(&temp_path);
+
         let json =
             serde_json::to_string_pretty(cache_file).map_err(|e| SikilError::ConfigError {
                 reason: format!("failed to serialize cache: {}", e),
@@ -194,6 +213,8 @@ impl JsonCache {
             reason: format!("failed to write cache temp file: {}", e),
         })?;
 
+        // Remove the target file first if it exists (for Windows compatibility)
+        let _ = fs::remove_file(&self.cache_path);
         fs::rename(&temp_path, &self.cache_path).map_err(|e| SikilError::ConfigError {
             reason: format!("failed to rename cache file: {}", e),
         })?;
@@ -280,8 +301,7 @@ impl Cache for JsonCache {
             .insert(path_str.to_string(), CachedEntry::from(entry));
 
         // Write (non-fatal on failure)
-        let _ = self.write(&cache_file);
-        Ok(())
+        self.write(&cache_file)
     }
 
     fn invalidate(&self, path: &Path) -> Result<(), SikilError> {

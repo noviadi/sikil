@@ -443,20 +443,26 @@ This is a test skill."#,
         let repo_dir = get_repo_path();
         fs::create_dir_all(&repo_dir).unwrap();
 
+        // Use unique name to avoid conflicts between test runs
+        let skill_name = "test-adopt-already-managed";
+        let managed_skill = repo_dir.join(skill_name);
+
+        // Clean up any leftover from previous test runs
+        let _ = fs::remove_dir_all(&managed_skill);
+
         // Create managed skill in repo
-        let managed_skill = repo_dir.join("managed-skill");
         fs::create_dir(&managed_skill).unwrap();
-        create_test_skill(&managed_skill, "managed-skill");
+        create_test_skill(&managed_skill, skill_name);
 
         // Create symlink in agent directory (already managed)
-        let symlink_path = agent_dir.join("managed-skill");
+        let symlink_path = agent_dir.join(skill_name);
         #[cfg(unix)]
         std::os::unix::fs::symlink(&managed_skill, &symlink_path).unwrap();
 
         let config = create_test_config_with_paths(&agent_dir);
         let args = AdoptArgs {
             json_mode: false,
-            name: "managed-skill".to_string(),
+            name: skill_name.to_string(),
             from: None,
         };
 

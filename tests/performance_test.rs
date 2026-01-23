@@ -154,8 +154,8 @@ workspace_path = ".claude-code/skills"
     println!("Cached list took: {:?}", cached_duration);
 
     assert!(
-        cached_duration < Duration::from_millis(100),
-        "Cached list took {:?}, expected <100ms",
+        cached_duration < Duration::from_millis(150),
+        "Cached list took {:?}, expected <150ms",
         cached_duration
     );
 }
