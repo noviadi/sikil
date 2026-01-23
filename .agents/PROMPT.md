@@ -6,20 +6,26 @@ Follow `AGENTS.md` for build commands, validation, and codebase patterns.
 
 ## Workflow
 
-1. Study specs/*.md using subagents. Give extra thoroughness on linked spec
-2. Read `IMPLEMENTATION_PLAN.md`, pick one uncompleted task
-3. **Write tests first** for the task's Acceptance Criteria
-4. Run tests — confirm they fail for the right reason (red), not compile errors
-5. Implement until tests pass (green)
-6. Refactor if needed
-7. Run `./scripts/verify.sh`
-8. Confirm Definition of Done (below)
-9. Update the task:
-   - Set `Completed: true`
-   - Populate `Tests:` field with test file(s) and name(s)
-   - Add `Notes:` if relevant
-10. Commit all changes (tests + code + plan update)
-11. Exit
+1. Read `IMPLEMENTATION_PLAN.md`
+2. **If no uncompleted tasks exist:**
+   - Review `Notes:` fields of completed tasks for unresolved bugs or issues
+   - Run `./scripts/verify.sh` to confirm everything passes
+   - If issues found: create a new task for the bug/issue, then continue to step 3
+   - If all clean: report "All tasks complete. Verification passed." and exit
+3. Pick one uncompleted task
+4. Study the linked spec thoroughly (use subagents for related specs)
+5. **Write tests first** for the task's Acceptance Criteria
+6. Run tests — confirm they fail for the right reason (red), not compile errors
+7. Implement until tests pass (green)
+8. Refactor if needed
+9. Run `./scripts/verify.sh`
+10. Confirm Definition of Done (below)
+11. Update the task:
+    - Set `Completed: true`
+    - Populate `Tests:` field with test file(s) and name(s)
+    - Add `Notes:` if relevant
+12. Commit all changes (tests + code + plan update)
+13. Exit
 
 ## Definition of Done
 

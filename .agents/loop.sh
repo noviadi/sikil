@@ -74,14 +74,14 @@ while true; do
         exit 1
     fi
 
-    # Push changes after each iteration (if nothing to push then just terminate)
-    if ! git diff --quiet HEAD @{u} 2>/dev/null; then
+    # Push changes after each iteration (if nothing to push, agent found no work)
+    if [ -n "$(git log --oneline @{u}..HEAD 2>/dev/null)" ]; then
         git push origin "$CURRENT_BRANCH" || {
             echo "Failed to push. Creating remote branch..."
             git push -u origin "$CURRENT_BRANCH"
         }
     else
-        echo "No new commits to push after $ITERATION iteration"
-        exit 0
+        echo "No new commits to push after $ITERATION iteration(s)"
+        break
     fi
 done
