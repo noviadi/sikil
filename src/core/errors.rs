@@ -66,6 +66,37 @@ pub enum SikilError {
     ConfigTooLarge { size: u64 },
 }
 
+impl SikilError {
+    /// Returns the appropriate exit code for this error type as defined in cli-schema.md:
+    /// - 2: Validation error (InvalidSkillMd, ValidationError, SymlinkNotAllowed, PathTraversal, InvalidGitUrl)
+    /// - 3: Skill not found
+    /// - 4: Permission denied
+    /// - 5: Network error (GitError)
+    /// - 1: All other errors (default)
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            // Validation errors (exit code 2)
+            SikilError::InvalidSkillMd { .. }
+            | SikilError::ValidationError { .. }
+            | SikilError::SymlinkNotAllowed { .. }
+            | SikilError::PathTraversal { .. }
+            | SikilError::InvalidGitUrl { .. } => 2,
+
+            // Skill not found (exit code 3)
+            SikilError::SkillNotFound { .. } => 3,
+
+            // Permission denied (exit code 4)
+            SikilError::PermissionDenied { .. } => 4,
+
+            // Network error (exit code 5)
+            SikilError::GitError { .. } => 5,
+
+            // Default error (exit code 1)
+            _ => 1,
+        }
+    }
+}
+
 /// Configuration-specific error type
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -221,5 +252,93 @@ mod tests {
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("SkillNotFound"));
         assert!(debug_str.contains("test"));
+    }
+
+    #[test]
+    fn test_exit_code_validation_error() {
+        // InvalidSkillMd should return exit code 2
+        let err = SikilError::InvalidSkillMd {
+            path: PathBuf::from("/test/SKILL.md"),
+            reason: "missing field".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+
+        // ValidationError should return exit code 2
+        let err = SikilError::ValidationError {
+            reason: "invalid input".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+
+        // SymlinkNotAllowed should return exit code 2
+        let err = SikilError::SymlinkNotAllowed {
+            reason: "symlinks not permitted".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+
+        // PathTraversal should return exit code 2
+        let err = SikilError::PathTraversal {
+            path: "../etc".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+
+        // InvalidGitUrl should return exit code 2
+        let err = SikilError::InvalidGitUrl {
+            url: "file://etc".to_string(),
+            reason: "bad protocol".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_skill_not_found() {
+        let err = SikilError::SkillNotFound {
+            name: "my-skill".to_string(),
+        };
+        assert_eq!(err.exit_code(), 3);
+    }
+
+    #[test]
+    fn test_exit_code_permission_denied() {
+        let err = SikilError::PermissionDenied {
+            operation: "read".to_string(),
+            path: PathBuf::from("/protected/file"),
+        };
+        assert_eq!(err.exit_code(), 4);
+    }
+
+    #[test]
+    fn test_exit_code_git_error() {
+        let err = SikilError::GitError {
+            reason: "clone failed".to_string(),
+        };
+        assert_eq!(err.exit_code(), 5);
+    }
+
+    #[test]
+    fn test_exit_code_default_error() {
+        // DirectoryNotFound should return exit code 1 (default)
+        let err = SikilError::DirectoryNotFound {
+            path: PathBuf::from("/not/found"),
+        };
+        assert_eq!(err.exit_code(), 1);
+
+        // SymlinkError should return exit code 1 (default)
+        let err = SikilError::SymlinkError {
+            reason: "failed".to_string(),
+            source: None,
+        };
+        assert_eq!(err.exit_code(), 1);
+
+        // ConfigError should return exit code 1 (default)
+        let err = SikilError::ConfigError {
+            reason: "bad config".to_string(),
+        };
+        assert_eq!(err.exit_code(), 1);
+
+        // AlreadyExists should return exit code 1 (default)
+        let err = SikilError::AlreadyExists {
+            resource: "skill".to_string(),
+        };
+        assert_eq!(err.exit_code(), 1);
     }
 }

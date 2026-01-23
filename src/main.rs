@@ -7,8 +7,20 @@ use sikil::commands::{
     UnmanageArgs, ValidateArgs,
 };
 use sikil::core::config::Config;
+use sikil::core::errors::SikilError;
 use sikil::core::skill::Agent;
 use sikil::utils::paths::get_config_path;
+
+/// Gets the appropriate exit code for an error.
+/// If the error is a `SikilError`, returns the exit code defined by that error type.
+/// Otherwise, returns the default exit code of 1.
+fn get_exit_code(err: &anyhow::Error) -> i32 {
+    if let Some(sikil_err) = err.downcast_ref::<SikilError>() {
+        sikil_err.exit_code()
+    } else {
+        1 // Default exit code for non-SikilError errors
+    }
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -70,7 +82,7 @@ fn main() {
             };
             if let Err(e) = execute_list(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Show { name } => {
@@ -81,7 +93,7 @@ fn main() {
             };
             if let Err(e) = execute_show(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Install { source, r#to } => {
@@ -94,7 +106,7 @@ fn main() {
             };
             if let Err(e) = execute_install_local(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Validate { path } => {
@@ -104,7 +116,7 @@ fn main() {
             };
             if let Err(e) = execute_validate(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Adopt { name, from } => {
@@ -115,7 +127,7 @@ fn main() {
             };
             if let Err(e) = execute_adopt(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Unmanage { name, agent, yes } => {
@@ -127,7 +139,7 @@ fn main() {
             };
             if let Err(e) = execute_unmanage(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Remove {
@@ -146,7 +158,7 @@ fn main() {
             };
             if let Err(e) = execute_remove(args, &config) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Sync { name, all, r#to } => {
@@ -159,7 +171,7 @@ fn main() {
             };
             if let Err(e) = execute_sync(args, &config, None) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Config { edit, set } => {
@@ -178,14 +190,14 @@ fn main() {
             };
             if let Err(e) = execute_config(args) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
         sikil::cli::Commands::Completions { shell, output } => {
             let args = CompletionsArgs { shell, output };
             if let Err(e) = execute_completions(args) {
                 eprintln!("Error: {}", e);
-                std::process::exit(1);
+                std::process::exit(get_exit_code(&e));
             }
         }
     }

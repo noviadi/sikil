@@ -146,11 +146,12 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
             print_human_readable(&output, &result);
         }
 
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
     // Check 2: YAML frontmatter is valid
-    let check = check_frontmatter_valid(&skill_md_path);
+    let check = check_frontmatter_valid(&skill_md_path)?;
+
     checks.push(check.clone());
 
     if !check.passed {
@@ -170,7 +171,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
             print_human_readable(&output, &result);
         }
 
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
     // Check 3: Parse metadata and validate required fields
@@ -199,7 +200,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
                 print_human_readable(&output, &result);
             }
 
-            std::process::exit(1);
+            std::process::exit(2);
         }
     };
 
@@ -267,7 +268,7 @@ pub fn execute_validate(args: ValidateArgs, config: &Config) -> Result<()> {
     if passed {
         Ok(())
     } else {
-        std::process::exit(1);
+        std::process::exit(2);
     }
 }
 
@@ -358,29 +359,38 @@ fn check_skill_md_exists(path: &Path) -> ValidationCheck {
 }
 
 /// Checks if YAML frontmatter is valid
-fn check_frontmatter_valid(path: &Path) -> ValidationCheck {
+///
+/// Returns `Err(SikilError::PermissionDenied)` if the file cannot be read due to permissions.
+fn check_frontmatter_valid(path: &Path) -> Result<ValidationCheck, SikilError> {
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
-            return ValidationCheck {
+            // Check if this is a permission error
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                return Err(SikilError::PermissionDenied {
+                    operation: "read".to_string(),
+                    path: path.to_path_buf(),
+                });
+            }
+            return Ok(ValidationCheck {
                 name: "YAML frontmatter is valid".to_string(),
                 passed: false,
                 error: Some(format!("Failed to read file: {}", e)),
-            };
+            });
         }
     };
 
     match extract_frontmatter(&content) {
-        Ok(_) => ValidationCheck {
+        Ok(_) => Ok(ValidationCheck {
             name: "YAML frontmatter is valid".to_string(),
             passed: true,
             error: None,
-        },
-        Err(e) => ValidationCheck {
+        }),
+        Err(e) => Ok(ValidationCheck {
             name: "YAML frontmatter is valid".to_string(),
             passed: false,
             error: Some(e.to_string()),
-        },
+        }),
     }
 }
 
@@ -573,7 +583,7 @@ This is a test skill."#;
         create_valid_skill_md(temp_dir.path());
 
         let skill_md = temp_dir.path().join("SKILL.md");
-        let check = check_frontmatter_valid(&skill_md);
+        let check = check_frontmatter_valid(&skill_md).unwrap();
         assert!(check.passed);
         assert!(check.error.is_none());
     }
@@ -586,7 +596,7 @@ description: No frontmatter markers"#;
         fs::write(temp_dir.path().join("SKILL.md"), content).unwrap();
 
         let skill_md = temp_dir.path().join("SKILL.md");
-        let check = check_frontmatter_valid(&skill_md);
+        let check = check_frontmatter_valid(&skill_md).unwrap();
         assert!(!check.passed);
         assert!(check.error.is_some());
     }

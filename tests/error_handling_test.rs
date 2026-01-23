@@ -178,8 +178,8 @@ fn test_permission_denied_read_skill_md() {
     perms.set_mode(0o644);
     fs::set_permissions(&skill_md, perms).unwrap();
 
-    result.stdout(
-        predicate::str::contains("Failed to read file").or(predicate::str::contains("permission")),
+    result.stderr(
+        predicate::str::contains("Permission denied").or(predicate::str::contains("permission")),
     );
 }
 
@@ -494,4 +494,108 @@ workspace_path = ".sikil/skills"
 
     // Should fix broken symlink or report it
     cmd.assert().success();
+}
+
+/// S05: Test distinct exit codes for different error types (cli-schema.md)
+/// These tests verify the implementation of distinct exit codes as defined in the spec:
+/// - 0: Success
+/// - 2: Validation error
+/// - 3: Skill not found
+/// - 4: Permission error
+/// - 5: Network error
+
+#[test]
+fn test_exit_code_validation_error() {
+    // Validation error should exit with code 2
+    let temp_dir = setup_temp_skill_dir();
+    let skill_dir = create_skill_dir(temp_dir.path(), "invalid-skill");
+
+    // Create invalid SKILL.md (missing required fields)
+    fs::write(skill_dir.join("SKILL.md"), "---\n---\n").unwrap();
+
+    let mut cmd = sikil_cmd!();
+    cmd.arg("validate").arg(skill_dir.to_str().unwrap());
+
+    cmd.assert()
+        .code(2)
+        .stdout(predicate::str::contains("Invalid SKILL.md"));
+}
+
+#[test]
+fn test_exit_code_skill_not_found() {
+    // Skill not found error should exit with code 3
+    let mut cmd = sikil_cmd!();
+    cmd.arg("show").arg("nonexistent-skill");
+
+    cmd.assert()
+        .code(3)
+        .stderr(predicate::str::contains("Skill not found"));
+}
+
+#[test]
+fn test_exit_code_permission_error() {
+    // Permission error should exit with code 4
+    let temp_dir = setup_temp_skill_dir();
+    let skill_dir = create_skill_dir(temp_dir.path(), "protected-skill");
+    create_minimal_skill_md(&skill_dir, "protected-skill", "Test skill");
+
+    let skill_md = skill_dir.join("SKILL.md");
+
+    // Remove read permissions
+    let mut perms = fs::metadata(&skill_md).unwrap().permissions();
+    perms.set_mode(0o000);
+    fs::set_permissions(&skill_md, perms).unwrap();
+
+    let mut cmd = sikil_cmd!();
+    cmd.arg("validate").arg(skill_dir.to_str().unwrap());
+
+    let result = cmd.assert().code(4);
+
+    // Restore permissions for cleanup
+    let mut perms = fs::metadata(&skill_md).unwrap().permissions();
+    perms.set_mode(0o644);
+    fs::set_permissions(&skill_md, perms).unwrap();
+
+    result.stderr(
+        predicate::str::contains("Permission denied").or(predicate::str::contains("permission")),
+    );
+}
+
+#[test]
+#[ignore] // TODO: This test requires Git URL detection to be wired in main.rs (task: "Wire Git URL detection to install command")
+fn test_exit_code_network_error() {
+    // Network (Git) error should exit with code 5
+    let temp_dir = setup_temp_skill_dir();
+
+    // Create a marker file to indicate this is a git URL test
+    let marker = temp_dir.path().join(".git");
+    fs::create_dir_all(&marker).unwrap();
+
+    let mut cmd = sikil_cmd!();
+    cmd.env("HOME", temp_dir.path())
+        .env("PATH", "") // Remove git from PATH to simulate network/git error
+        .arg("install")
+        .arg("https://github.com/user/nonexistent-repo-that-does-not-exist-12345.git")
+        .arg("--to")
+        .arg("all");
+
+    // Git errors should exit with code 5
+    cmd.assert().code(5).stderr(
+        predicate::str::contains("Git error")
+            .or(predicate::str::contains("git"))
+            .or(predicate::str::contains("command not found")),
+    );
+}
+
+#[test]
+fn test_exit_code_success() {
+    // Success should exit with code 0
+    let temp_dir = setup_temp_skill_dir();
+    let repo_dir = temp_dir.path().join(".sikil").join("repo");
+    fs::create_dir_all(&repo_dir).unwrap();
+
+    let mut cmd = sikil_cmd!();
+    cmd.env("HOME", temp_dir.path()).arg("list");
+
+    cmd.assert().success().code(0);
 }
