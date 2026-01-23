@@ -65,9 +65,9 @@ None - all specs have complete Acceptance Criteria.
   - Cache read failure is treated as cache miss (non-fatal)
   - Cache write failure is non-fatal (operation continues)
   - Cache file is created at `~/.sikil/cache.json`
-- **Tests:** src/core/cache.rs (test_cache_put_and_get, test_cache_put_creates_valid_json, test_cache_invalidate, test_cache_clear, test_cache_clean_stale, test_cache_replace_existing_entry, test_cache_entry_with_none_skill_name, test_cache_put_rejects_oversized_hash, test_cache_version_mismatch_clears_cache, test_cache_size_limit_clears_cache, test_cache_write_uses_atomic_temp_file, test_cache_put_with_max_hash_size_succeeds, test_cache_entries_use_btreemap_for_determinism, test_cache_get_returns_none_when_mtime_mismatch, test_cache_file_pretty_printed)
-- **Location:** src/core/cache.rs
-- **Notes:**
+  - **Tests:** src/core/cache.rs (test_cache_put_and_get, test_cache_put_creates_valid_json, test_cache_invalidate, test_cache_clear, test_cache_clean_stale, test_cache_replace_existing_entry, test_cache_entry_with_none_skill_name, test_cache_put_rejects_oversized_hash, test_cache_version_mismatch_clears_cache, test_cache_size_limit_clears_cache, test_cache_write_uses_atomic_temp_file, test_cache_put_with_max_hash_size_succeeds, test_cache_entries_use_btreemap_for_determinism, test_cache_get_returns_none_when_mtime_mismatch, test_cache_file_pretty_printed)
+  - **Location:** src/core/cache.rs
+  - **Notes:**
   - Replaced `SqliteCache` struct with `JsonCache`
   - Added `CacheFile` struct with `version: u32` and `entries: BTreeMap<String, CachedEntry>`
   - Added `CachedEntry` struct for on-disk representation (path is key, not in struct)
@@ -76,18 +76,18 @@ None - all specs have complete Acceptance Criteria.
   - Check file size on load, clear if >15 MB
   - All cache errors except put() with invalid hash are non-fatal
 
-### Update scanner to use JsonCache
-- **Spec:** skill-scanner.md
-- **Gap:** Scanner imports and uses `SqliteCache` but spec references `Cache` (JSON)
-- **Completed:** true
+  ### Update scanner to use JsonCache
+  - **Spec:** skill-scanner.md
+  - **Gap:** Scanner imports and uses `SqliteCache` but spec references `Cache` (JSON)
+  - **Completed:** true
 - **Acceptance Criteria:**
   - Symlinks pointing to `~/.sikil/repo/` are classified as managed
   - Symlinks pointing outside `~/.sikil/repo/` are classified as foreign symlinks
   - Non-existent symlink targets are classified as broken symlinks
   - Physical directories (not symlinks) are classified as unmanaged
-- **Tests:** src/core/scanner.rs (test_scanner_with_cache_enabled, test_scanner_with_cache_disabled, test_scanner_cache_invalidation_on_mtime_change, test_scanner_cached_run_is_faster_than_uncached, test_scanner_cache_invalid_skill_to_valid)
-- **Location:** src/core/scanner.rs, src/core/mod.rs
-- **Notes:**
+  - **Tests:** src/core/scanner.rs (test_scanner_with_cache_enabled, test_scanner_with_cache_disabled, test_scanner_cache_invalidation_on_mtime_change, test_scanner_cached_run_is_faster_than_uncached, test_scanner_cache_invalid_skill_to_valid)
+  - **Location:** src/core/scanner.rs, src/core/mod.rs
+  - **Notes:**
   - Changed import from `SqliteCache` to `JsonCache` in scanner.rs and mod.rs
   - Updated `cache: Option<JsonCache>` field type
   - Updated constructor calls to use `JsonCache::open()`
@@ -97,11 +97,11 @@ None - all specs have complete Acceptance Criteria.
 - **Gap:** Cargo.toml includes `rusqlite` but spec no longer lists it as a dependency
 - **Completed:** true
 - **Acceptance Criteria:**
-  - `cargo build --release` produces binary under 10MB
+   - `cargo build --release` produces binary under 10MB
 - **Tests:** tests/build_test.rs (test_release_binary_size_under_10mb, test_format_size_mb, test_format_size_kb, test_max_binary_size_constant)
 - **Location:** Cargo.toml
 - **Notes:**
-  - Removed line 18: `rusqlite = { version = "0.31", features = ["bundled"] }`
-  - Binary size remains at ~3.3 MB (unchanged) because LTO was already eliminating unused rusqlite code
-  - This task depends on: Replace SqliteCache with JsonCache, Update scanner to use JsonCache
-  - Created `tests/build_test.rs` with automated test for binary size constraint (10MB limit per spec)
+   - Removed line 18: `rusqlite = { version = "0.31", features = ["bundled"] }`
+   - Binary size remains at ~3.3 MB (unchanged) because LTO was already eliminating unused rusqlite code
+   - This task depends on: Replace SqliteCache with JsonCache, Update scanner to use JsonCache
+   - Created `tests/build_test.rs` with automated test for binary size constraint (10MB limit per spec)
