@@ -95,12 +95,13 @@ None - all specs have complete Acceptance Criteria.
 ### Remove rusqlite dependency from Cargo.toml
 - **Spec:** build-and-platform.md
 - **Gap:** Cargo.toml includes `rusqlite` but spec no longer lists it as a dependency
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `cargo build --release` produces binary under 10MB
-- **Tests:**
+- **Tests:** tests/build_test.rs (test_release_binary_size_under_10mb, test_format_size_mb, test_format_size_kb, test_max_binary_size_constant)
 - **Location:** Cargo.toml
 - **Notes:**
-  - Remove line 18: `rusqlite = { version = "0.31", features = ["bundled"] }`
+  - Removed line 18: `rusqlite = { version = "0.31", features = ["bundled"] }`
+  - Binary size remains at ~3.3 MB (unchanged) because LTO was already eliminating unused rusqlite code
   - This task depends on: Replace SqliteCache with JsonCache, Update scanner to use JsonCache
-  - Binary size should decrease by ~1-2 MB
+  - Created `tests/build_test.rs` with automated test for binary size constraint (10MB limit per spec)
