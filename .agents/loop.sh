@@ -46,7 +46,7 @@ fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 tmpfile=""
-cleanup() { rm -f "$tmpfile"; }
+cleanup() { [[ -n "${tmpfile:-}" ]] && rm -f -- "$tmpfile"; }
 trap cleanup EXIT
 
 while true; do
@@ -58,6 +58,9 @@ while true; do
     ITERATION=$((ITERATION + 1))
     echo -e "\n======================== ITERATION $ITERATION ========================\n"
 
+    # Capture HEAD before agent run to detect if agent made commits
+    before_head=$(git rev-parse HEAD)
+
     # Temp file for raw output (cleaned up at end of iteration or on exit)
     tmpfile=$(mktemp)
 
@@ -66,28 +69,52 @@ while true; do
     # --dangerously-skip-permissions: Auto-approve all tool calls
     # --output-format=stream-json: Structured output for logging/monitoring
     # --verbose: Detailed execution logging
-    if ! cat "$PROMPT_FILE" | claude -p \
+    set +e
+    cat "$PROMPT_FILE" | claude -p \
         --dangerously-skip-permissions \
         --output-format=stream-json \
         --verbose \
         | grep --line-buffered '^{' \
         | tee "$tmpfile" \
-        | jq --unbuffered -rj "$STREAM_TEXT"; then
-        echo "Error: Claude failed with exit code $?"
+        | jq --unbuffered -rj "$STREAM_TEXT"
+    pipe_status=("${PIPESTATUS[@]}")
+    set -e
+
+    # Check pipeline stages for failures
+    for s in "${pipe_status[@]}"; do
+        if [[ "$s" -ne 0 ]]; then
+            echo "Error: Agent pipeline failed with status: ${pipe_status[*]}"
+            exit 1
+        fi
+    done
+
+    # Verify branch didn't change during agent run
+    after_branch=$(git symbolic-ref --quiet --short HEAD) || {
+        echo "Error: Detached HEAD after agent run"
+        exit 1
+    }
+    if [[ "$after_branch" != "$CURRENT_BRANCH" ]]; then
+        echo "Error: Branch changed during agent run: $CURRENT_BRANCH -> $after_branch"
         exit 1
     fi
 
-    # Push changes after each iteration (if nothing to push, agent found no work)
-    if [ -n "$(git log --oneline @{u}..HEAD 2>/dev/null)" ]; then
-        git push origin "$CURRENT_BRANCH" || {
-            echo "Failed to push. Creating remote branch..."
-            git push -u origin "$CURRENT_BRANCH"
-        }
-    else
-        echo "No new commits to push after $ITERATION iteration(s)"
-        cleanup
+    # Compare HEAD to detect if agent made commits
+    after_head=$(git rev-parse HEAD)
+
+    if [[ "$after_head" == "$before_head" ]]; then
+        # No commit created: verify working tree is clean (agent shouldn't leave uncommitted changes)
+        if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "Error: No commit created but working tree is dirty (agent violated workflow)"
+            git status --porcelain
+            exit 1
+        fi
+        echo "No new commits after $ITERATION iteration(s) — agent found no remaining work"
         break
     fi
+
+    # Agent created commit(s): push to remote
+    git fetch origin "$CURRENT_BRANCH" 2>/dev/null || true
+    git push -u origin "$CURRENT_BRANCH"
 
     # Clean up temp file before next iteration
     cleanup

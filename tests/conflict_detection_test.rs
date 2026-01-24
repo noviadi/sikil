@@ -189,8 +189,21 @@ workspace_path = ".windsurf/skills"
     let mut cmd = sikil_cmd!();
     cmd.env("HOME", temp_dir.path());
 
+    // Test without verbose: DuplicateManaged is suppressed
     cmd.arg("list")
         .arg("--no-cache")
+        .assert()
+        .success()
+        .stdout(contains("1 info suppressed"))
+        .stdout(contains("Found 1 skill (1 managed, 0 unmanaged)"));
+
+    // Test with verbose: DuplicateManaged is shown
+    let mut cmd_verbose = sikil_cmd!();
+    cmd_verbose.env("HOME", temp_dir.path());
+    cmd_verbose
+        .arg("list")
+        .arg("--no-cache")
+        .arg("-v")
         .assert()
         .success()
         .stdout(contains("1 info"))

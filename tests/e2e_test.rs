@@ -377,6 +377,7 @@ fn test_e2e_conflict_detection_flow() {
     cmd.env("HOME", home)
         .arg("list")
         .arg("--conflicts")
+        .arg("--no-cache")
         .assert()
         .success()
         .stdout(contains("conflict-skill"))
@@ -435,12 +436,13 @@ fn test_e2e_conflict_detection_flow() {
         .assert()
         .success();
 
-    // Step 8: No conflicts should remain (duplicate managed is info, not conflict)
-    // The --conflicts flag shows info about duplicate managed skills, which is normal
+    // Step 8: DuplicateManaged is now an info-level conflict (not shown without -v)
+    // With -v, the conflict is shown
     let mut cmd = sikil_cmd!();
     cmd.env("HOME", home)
         .arg("list")
         .arg("--conflicts")
+        .arg("-v")
         .assert()
         .success()
         .stdout(contains("conflict-skill"));
