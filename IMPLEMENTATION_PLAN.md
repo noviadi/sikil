@@ -123,16 +123,22 @@ None - all specs have complete Acceptance Criteria.
 ### Update format_conflicts_summary to accept verbose parameter
 - **Spec:** conflict-detection.md
 - **Gap:** Current `format_conflicts_summary()` takes only `&[Conflict]`, spec requires `verbose: bool` parameter to control "suppressed" text
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `format_conflicts_summary(verbose: false)` shows "N info suppressed" for info-only conflicts
   - `format_conflicts_summary(verbose: true)` shows "N info" for info-only conflicts
   - `format_conflicts_summary()` returns "No conflicts detected" when no conflicts exist
   - `format_conflicts_summary()` with mixed conflicts shows "N errors, M info suppressed" when not verbose
   - `format_conflicts_summary()` with mixed conflicts shows "N errors, M info" when verbose
-- **Tests:**
-- **Location:** src/core/conflicts.rs
-- **Notes:** Existing tests call `format_conflicts_summary(&conflicts)` without verbose param - need to update
+- **Tests:** src/core/conflicts.rs (test_format_conflicts_summary_empty, test_format_conflicts_summary_errors_only, test_format_conflicts_summary_info_only, test_format_conflicts_summary_mixed, test_format_conflicts_summary_verbose_false_info_only_shows_suppressed, test_format_conflicts_summary_verbose_true_info_only_shows_info, test_format_conflicts_summary_verbose_false_errors_only_shows_errors, test_format_conflicts_summary_verbose_true_errors_only_shows_errors, test_format_conflicts_summary_verbose_false_mixed_shows_suppressed, test_format_conflicts_summary_verbose_true_mixed_shows_info, test_format_conflicts_summary_verbose_false_empty_shows_no_conflicts, test_format_conflicts_summary_verbose_true_empty_shows_no_conflicts, test_format_conflicts_summary_verbose_false_single_error, test_format_conflicts_summary_verbose_false_single_info_suppressed, test_format_conflicts_summary_verbose_true_single_info)
+- **Location:** src/core/conflicts.rs, src/commands/list.rs
+- **Notes:**
+  - Added `verbose: bool` parameter to `format_conflicts_summary()` function at line 371
+  - When `verbose: false`, shows "N info suppressed" for info-only conflicts
+  - When `verbose: true`, shows "N info" for info-only conflicts
+  - Updated all existing test calls to pass `verbose` parameter (mostly `true` for backward compatibility)
+  - Added 11 new tests specifically for verbose parameter behavior
+  - Updated `list.rs` to call with `false` as default until `verbose` field is added to `ListArgs` (see task "Add verbose field to ListArgs")
 
 ### Add verbose field to ListArgs and wire through CLI
 - **Spec:** conflict-detection.md

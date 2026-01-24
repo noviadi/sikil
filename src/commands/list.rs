@@ -272,7 +272,8 @@ fn print_human_readable(
     let unmanaged_count = skills.len() - managed_count;
 
     // Print header with summary including conflicts
-    let conflicts_summary = crate::core::conflicts::format_conflicts_summary(all_conflicts);
+    // TODO: Pass verbose from ListArgs once it's added (see task "Add verbose field to ListArgs")
+    let conflicts_summary = crate::core::conflicts::format_conflicts_summary(all_conflicts, false);
     output.print_info(&format!(
         "Found {} skill{} ({} managed, {} unmanaged) - {}",
         skills.len(),

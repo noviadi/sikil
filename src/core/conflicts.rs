@@ -363,11 +363,12 @@ pub fn format_conflict(conflict: &Conflict) -> String {
 /// # Arguments
 ///
 /// * `conflicts` - The conflicts to summarize
+/// * `verbose` - Whether to show "N info" (true) or "N info suppressed" (false)
 ///
 /// # Returns
 ///
 /// A formatted summary string
-pub fn format_conflicts_summary(conflicts: &[Conflict]) -> String {
+pub fn format_conflicts_summary(conflicts: &[Conflict], verbose: bool) -> String {
     let error_count = conflicts
         .iter()
         .filter(|c| c.conflict_type.is_error())
@@ -383,7 +384,12 @@ pub fn format_conflicts_summary(conflicts: &[Conflict]) -> String {
         ));
     }
     if info_count > 0 {
-        parts.push(format!("{} info", info_count));
+        let info_text = if verbose {
+            format!("{} info", info_count)
+        } else {
+            format!("{} info suppressed", info_count)
+        };
+        parts.push(info_text);
     }
 
     if parts.is_empty() {
@@ -891,7 +897,7 @@ mod tests {
     #[test]
     fn test_format_conflicts_summary_empty() {
         let conflicts: Vec<Conflict> = vec![];
-        let summary = format_conflicts_summary(&conflicts);
+        let summary = format_conflicts_summary(&conflicts, true);
         assert_eq!(summary, "No conflicts detected");
     }
 
@@ -909,7 +915,7 @@ mod tests {
                 ConflictType::DuplicateUnmanaged,
             ),
         ];
-        let summary = format_conflicts_summary(&conflicts);
+        let summary = format_conflicts_summary(&conflicts, true);
         assert_eq!(summary, "2 errors");
     }
 
@@ -920,7 +926,7 @@ mod tests {
             Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
             Conflict::new("info3".to_string(), vec![], ConflictType::DuplicateManaged),
         ];
-        let summary = format_conflicts_summary(&conflicts);
+        let summary = format_conflicts_summary(&conflicts, true);
         assert_eq!(summary, "3 info");
     }
 
@@ -939,7 +945,7 @@ mod tests {
                 ConflictType::DuplicateUnmanaged,
             ),
         ];
-        let summary = format_conflicts_summary(&conflicts);
+        let summary = format_conflicts_summary(&conflicts, true);
         assert!(summary.contains("2 errors"));
         assert!(summary.contains("1 info"));
     }
@@ -1036,5 +1042,150 @@ mod tests {
 
         let displayable = filter_displayable_conflicts(&conflicts, false);
         assert_eq!(displayable.len(), 2);
+    }
+
+    // Tests for format_conflicts_summary with verbose parameter
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_info_only_shows_suppressed() {
+        let conflicts = vec![
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info3".to_string(), vec![], ConflictType::DuplicateManaged),
+        ];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "3 info suppressed");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_true_info_only_shows_info() {
+        let conflicts = vec![
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info3".to_string(), vec![], ConflictType::DuplicateManaged),
+        ];
+        let summary = format_conflicts_summary(&conflicts, true);
+        assert_eq!(summary, "3 info");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_errors_only_shows_errors() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "2 errors");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_true_errors_only_shows_errors() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts, true);
+        assert_eq!(summary, "2 errors");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_mixed_shows_suppressed() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "2 errors, 1 info suppressed");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_true_mixed_shows_info() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+        let summary = format_conflicts_summary(&conflicts, true);
+        assert_eq!(summary, "2 errors, 1 info");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_empty_shows_no_conflicts() {
+        let conflicts: Vec<Conflict> = vec![];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "No conflicts detected");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_true_empty_shows_no_conflicts() {
+        let conflicts: Vec<Conflict> = vec![];
+        let summary = format_conflicts_summary(&conflicts, true);
+        assert_eq!(summary, "No conflicts detected");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_single_error() {
+        let conflicts = vec![Conflict::new(
+            "error1".to_string(),
+            vec![],
+            ConflictType::DuplicateUnmanaged,
+        )];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "1 error");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_false_single_info_suppressed() {
+        let conflicts = vec![Conflict::new(
+            "info1".to_string(),
+            vec![],
+            ConflictType::DuplicateManaged,
+        )];
+        let summary = format_conflicts_summary(&conflicts, false);
+        assert_eq!(summary, "1 info suppressed");
+    }
+
+    #[test]
+    fn test_format_conflicts_summary_verbose_true_single_info() {
+        let conflicts = vec![Conflict::new(
+            "info1".to_string(),
+            vec![],
+            ConflictType::DuplicateManaged,
+        )];
+        let summary = format_conflicts_summary(&conflicts, true);
+        assert_eq!(summary, "1 info");
     }
 }
