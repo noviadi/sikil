@@ -27,6 +27,8 @@ pub struct ListArgs {
     pub conflicts_only: bool,
     /// Filter to show only duplicate skills
     pub duplicates_only: bool,
+    /// Enable verbose output (show info-level conflicts)
+    pub verbose: bool,
 }
 
 /// Output format for a single skill in the list
@@ -106,6 +108,7 @@ fn get_disabled_default_agents(config: &Config) -> Vec<(String, String)> {
 ///     unmanaged_only: false,
 ///     conflicts_only: false,
 ///     duplicates_only: false,
+///     verbose: false,
 /// };
 /// let config = Config::default();
 /// execute_list(args, &config).unwrap();
@@ -204,7 +207,7 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     if args.json_mode {
         output.print_json(&output_skills)?;
     } else {
-        print_human_readable(&output, &output_skills, &all_conflicts);
+        print_human_readable(&output, &output_skills, &all_conflicts, args.verbose);
     }
 
     Ok(())
@@ -243,18 +246,26 @@ fn apply_filters<'a>(
 
     // Apply --conflicts filter using the conflicts module
     if args.conflicts_only {
-        // Get skill names that have conflicts
-        let conflict_skill_names: std::collections::HashSet<_> =
-            all_conflicts.iter().map(|c| &c.skill_name).collect();
+        // Use filter_displayable_conflicts to respect verbose mode
+        let displayable_conflicts =
+            conflicts::filter_displayable_conflicts(all_conflicts, args.verbose);
+        let conflict_skill_names: std::collections::HashSet<_> = displayable_conflicts
+            .iter()
+            .map(|c| &c.skill_name)
+            .collect();
 
         filtered.retain(|skill| conflict_skill_names.contains(&skill.metadata.name));
     }
 
     // Apply --duplicates filter (alias for conflicts)
     if args.duplicates_only {
-        // Get skill names that have conflicts
-        let conflict_skill_names: std::collections::HashSet<_> =
-            all_conflicts.iter().map(|c| &c.skill_name).collect();
+        // Use filter_displayable_conflicts to respect verbose mode
+        let displayable_conflicts =
+            conflicts::filter_displayable_conflicts(all_conflicts, args.verbose);
+        let conflict_skill_names: std::collections::HashSet<_> = displayable_conflicts
+            .iter()
+            .map(|c| &c.skill_name)
+            .collect();
 
         filtered.retain(|skill| conflict_skill_names.contains(&skill.metadata.name));
     }
@@ -267,13 +278,14 @@ fn print_human_readable(
     output: &Output,
     skills: &[ListSkillOutput],
     all_conflicts: &[crate::core::conflicts::Conflict],
+    verbose: bool,
 ) {
     let managed_count = skills.iter().filter(|s| s.managed).count();
     let unmanaged_count = skills.len() - managed_count;
 
     // Print header with summary including conflicts
-    // TODO: Pass verbose from ListArgs once it's added (see task "Add verbose field to ListArgs")
-    let conflicts_summary = crate::core::conflicts::format_conflicts_summary(all_conflicts, false);
+    let conflicts_summary =
+        crate::core::conflicts::format_conflicts_summary(all_conflicts, verbose);
     output.print_info(&format!(
         "Found {} skill{} ({} managed, {} unmanaged) - {}",
         skills.len(),
@@ -375,9 +387,11 @@ fn print_human_readable(
     }
 
     // Print conflict details and recommendations if any conflicts exist
-    if !all_conflicts.is_empty() {
+    // Filter based on verbose mode - don't print DuplicateManaged conflicts unless verbose
+    let displayable_conflicts = conflicts::filter_displayable_conflicts(all_conflicts, verbose);
+    if !displayable_conflicts.is_empty() {
         output.print_info("");
-        for conflict in all_conflicts {
+        for conflict in displayable_conflicts {
             output.print_info(&conflicts::format_conflict(conflict));
             output.print_info("  Recommendations:");
             for (i, rec) in conflict.recommendations().iter().enumerate() {
@@ -468,6 +482,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let config = Config::new(); // Empty config
@@ -487,10 +502,28 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         assert!(args.json_mode);
         assert!(!args.no_cache);
+        assert!(!args.verbose);
+    }
+
+    #[test]
+    fn test_list_args_with_verbose() {
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: false,
+            duplicates_only: false,
+            verbose: true,
+        };
+
+        assert!(args.verbose);
     }
 
     #[test]
@@ -546,6 +579,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let conflicts = vec![];
@@ -594,6 +628,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let conflicts = vec![];
@@ -642,6 +677,7 @@ mod tests {
             unmanaged_only: true,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let conflicts = vec![];
@@ -720,6 +756,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: true,
+            verbose: false,
         };
 
         let filtered = apply_filters(&skills, &args, &conflicts);
@@ -765,6 +802,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let conflicts = vec![];
@@ -821,6 +859,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: false,
             duplicates_only: false,
+            verbose: false,
         };
 
         let conflicts = vec![];
@@ -884,6 +923,7 @@ mod tests {
             unmanaged_only: false,
             conflicts_only: true,
             duplicates_only: false,
+            verbose: false,
         };
 
         let filtered = apply_filters(&skills, &args, &conflicts);
@@ -946,5 +986,171 @@ mod tests {
         let disabled = get_disabled_default_agents(&config);
         // Custom agent should not be in the disabled list since it's not a default agent
         assert_eq!(disabled.len(), 0);
+    }
+
+    #[test]
+    fn test_apply_filters_conflicts_only_verbose_false_filters_info_conflicts() {
+        use crate::core::conflicts::{Conflict, ConflictLocation, ConflictType};
+        use std::path::PathBuf;
+
+        // Skill with DuplicateManaged conflict (info-level, not error)
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "managed-skill".to_string(),
+                "A managed skill".to_string(),
+            ),
+            "managed-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/managed-skill"),
+            Scope::Global,
+        ))
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skills/managed-skill"),
+            Scope::Global,
+        ));
+
+        // Skill with DuplicateUnmanaged conflict (error-level)
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "unmanaged-skill".to_string(),
+                "An unmanaged skill".to_string(),
+            ),
+            "unmanaged-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/unmanaged-skill"),
+            Scope::Global,
+        ))
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::Windsurf,
+            PathBuf::from("/windsurf/skills/unmanaged-skill"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // Create conflicts: one managed (info) and one unmanaged (error)
+        let conflicts = vec![
+            Conflict::new(
+                "managed-skill".to_string(),
+                vec![ConflictLocation::new(
+                    "claude-code".to_string(),
+                    PathBuf::from("/claude/skills/managed-skill"),
+                    true,
+                    None,
+                )],
+                ConflictType::DuplicateManaged,
+            ),
+            Conflict::new(
+                "unmanaged-skill".to_string(),
+                vec![ConflictLocation::new(
+                    "claude-code".to_string(),
+                    PathBuf::from("/claude/skills/unmanaged-skill"),
+                    false,
+                    None,
+                )],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+
+        // Filter by conflicts only with verbose=false should only show error conflicts
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: true,
+            duplicates_only: false,
+            verbose: false,
+        };
+
+        let filtered = apply_filters(&skills, &args, &conflicts);
+        // Should only include the error-level conflict skill
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].metadata.name, "unmanaged-skill");
+    }
+
+    #[test]
+    fn test_apply_filters_conflicts_only_verbose_true_includes_info_conflicts() {
+        use crate::core::conflicts::{Conflict, ConflictLocation, ConflictType};
+        use std::path::PathBuf;
+
+        // Skill with DuplicateManaged conflict (info-level)
+        let skill1 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "managed-skill".to_string(),
+                "A managed skill".to_string(),
+            ),
+            "managed-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/managed-skill"),
+            Scope::Global,
+        ));
+
+        // Skill with DuplicateUnmanaged conflict (error-level)
+        let skill2 = Skill::new(
+            crate::core::skill::SkillMetadata::new(
+                "unmanaged-skill".to_string(),
+                "An unmanaged skill".to_string(),
+            ),
+            "unmanaged-skill".to_string(),
+        )
+        .with_installation(crate::core::skill::Installation::new(
+            Agent::ClaudeCode,
+            PathBuf::from("/claude/skills/unmanaged-skill"),
+            Scope::Global,
+        ));
+
+        let skills = vec![skill1, skill2];
+
+        // Create conflicts: one managed (info) and one unmanaged (error)
+        let conflicts = vec![
+            Conflict::new(
+                "managed-skill".to_string(),
+                vec![ConflictLocation::new(
+                    "claude-code".to_string(),
+                    PathBuf::from("/claude/skills/managed-skill"),
+                    true,
+                    None,
+                )],
+                ConflictType::DuplicateManaged,
+            ),
+            Conflict::new(
+                "unmanaged-skill".to_string(),
+                vec![ConflictLocation::new(
+                    "claude-code".to_string(),
+                    PathBuf::from("/claude/skills/unmanaged-skill"),
+                    false,
+                    None,
+                )],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+
+        // Filter by conflicts only with verbose=true should show both error and info conflicts
+        let args = ListArgs {
+            json_mode: false,
+            no_cache: false,
+            agent_filter: None,
+            managed_only: false,
+            unmanaged_only: false,
+            conflicts_only: true,
+            duplicates_only: false,
+            verbose: true,
+        };
+
+        let filtered = apply_filters(&skills, &args, &conflicts);
+        // Should include both skills
+        assert_eq!(filtered.len(), 2);
+        let skill_names: Vec<_> = filtered.iter().map(|s| &s.metadata.name).collect();
+        assert!(skill_names.contains(&&"managed-skill".to_string()));
+        assert!(skill_names.contains(&&"unmanaged-skill".to_string()));
     }
 }

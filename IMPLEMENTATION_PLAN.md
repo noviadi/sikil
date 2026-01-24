@@ -143,14 +143,21 @@ None - all specs have complete Acceptance Criteria.
 ### Add verbose field to ListArgs and wire through CLI
 - **Spec:** conflict-detection.md
 - **Gap:** `ListArgs` struct lacks `verbose` field, CLI verbose flag not passed to list command
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `DuplicateManaged` conflict details are not printed in human-readable output unless verbose mode is enabled
   - `--conflicts` filter shows only error-level conflicts by default
   - `--conflicts -v` filter shows both error and info conflicts
-- **Tests:**
+- **Tests:** src/commands/list.rs (test_list_args_with_verbose, test_apply_filters_conflicts_only_verbose_false_filters_info_conflicts, test_apply_filters_conflicts_only_verbose_true_includes_info_conflicts), tests/conflict_detection_test.rs (test_duplicate_managed_detection), tests/e2e_test.rs (test_e2e_conflict_detection_flow)
 - **Location:** src/commands/list.rs, src/main.rs
-- **Notes:** The global `-v/--verbose` flag already exists in cli/app.rs, just needs to be passed through
+- **Notes:**
+  - Added `verbose: bool` field to `ListArgs` struct at line 31
+  - Updated `apply_filters()` to use `filter_displayable_conflicts()` with verbose flag when filtering by conflicts
+  - Updated `print_human_readable()` to accept and use verbose parameter for conflicts summary and details
+  - Wired `cli.verbose` to `ListArgs.verbose` in main.rs
+  - Updated all existing tests to include `verbose: false` in `ListArgs` instantiations
+  - Updated `test_duplicate_managed_detection` to test both verbose=false (suppressed) and verbose=true (shown) cases
+  - Updated `test_e2e_conflict_detection_flow` to add `--no-cache` flag and `-v` flag for DuplicateManaged case
 
 ### Suppress DuplicateManaged conflicts in human-readable output
 - **Spec:** conflict-detection.md

@@ -128,6 +128,7 @@ fn main() {
                 unmanaged_only: unmanaged,
                 conflicts_only: conflicts,
                 duplicates_only: duplicates,
+                verbose: cli.verbose,
             };
             if let Err(e) = execute_list(args, &config) {
                 eprintln!("Error: {}", e);
