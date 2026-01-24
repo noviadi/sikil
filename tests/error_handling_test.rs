@@ -562,7 +562,6 @@ fn test_exit_code_permission_error() {
 }
 
 #[test]
-#[ignore] // TODO: This test requires Git URL detection to be wired in main.rs (task: "Wire Git URL detection to install command")
 fn test_exit_code_network_error() {
     // Network (Git) error should exit with code 5
     let temp_dir = setup_temp_skill_dir();

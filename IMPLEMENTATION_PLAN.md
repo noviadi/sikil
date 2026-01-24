@@ -10,6 +10,20 @@ None - all specs have complete Acceptance Criteria.
 
 ## Tasks
 
+### Enable test_exit_code_network_error test
+- **Spec:** cli-schema.md
+- **Gap:** `test_exit_code_network_error` test was marked as `#[ignore]` but Git URL detection is now implemented
+- **Completed:** true
+- **Acceptance Criteria:**
+  - `test_exit_code_network_error` test runs without `--ignored` flag
+  - `test_exit_code_network_error` test passes
+- **Tests:** tests/error_handling_test.rs (test_exit_code_network_error)
+- **Location:** tests/error_handling_test.rs
+- **Notes:**
+  - Removed `#[ignore]` attribute from test_exit_code_network_error
+  - Test now runs as part of normal test suite since Git URL detection is implemented
+  - Resolves TODO comment in error_handling_test.rs line 565
+
 ### Implement distinct exit codes for error types
 - **Spec:** cli-schema.md
 - **Gap:** CLI always exits with code 1, but spec defines distinct exit codes (2 for validation, 3 for skill not found, 4 for permission, 5 for network)
@@ -25,7 +39,7 @@ None - all specs have complete Acceptance Criteria.
   - Added `exit_code()` method to `SikilError` that maps error types to appropriate exit codes
   - Modified `main.rs` to use `get_exit_code()` helper for extracting exit code from errors
   - Modified `validate.rs` to exit with code 2 for validation failures and detect permission errors specifically
-  - Network error test (`test_exit_code_network_error`) is marked as `#[ignore]` because it requires Git URL detection to be implemented first (see task "Wire Git URL detection to install command")
+  - Network error test (`test_exit_code_network_error`) was marked as `#[ignore]` but is now enabled (see task "Enable test_exit_code_network_error test")
 
 ### Wire Git URL detection to install command
 - **Spec:** skill-installation.md
