@@ -109,13 +109,16 @@ None - all specs have complete Acceptance Criteria.
 ### Add filter_displayable_conflicts function
 - **Spec:** conflict-detection.md
 - **Gap:** `filter_displayable_conflicts()` function defined in spec but does not exist in code
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `filter_displayable_conflicts()` with `verbose: false` excludes `DuplicateManaged` conflicts
   - `filter_displayable_conflicts()` with `verbose: true` includes all conflicts
-- **Tests:**
+- **Tests:** src/core/conflicts.rs (test_filter_displayable_conflicts_verbose_false_excludes_managed, test_filter_displayable_conflicts_verbose_true_includes_all, test_filter_displayable_conflicts_verbose_false_only_managed_returns_empty, test_filter_displayable_conflicts_verbose_true_only_managed_includes_all, test_filter_displayable_conflicts_empty_conflicts, test_filter_displayable_conflicts_verbose_false_only_unmanaged_includes_all)
 - **Location:** src/core/conflicts.rs
 - **Notes:**
+  - Added `filter_displayable_conflicts()` function at line 299
+  - When `verbose: false`, filters to only error conflicts (excluding `DuplicateManaged`)
+  - When `verbose: true`, returns all conflicts unchanged
 
 ### Update format_conflicts_summary to accept verbose parameter
 - **Spec:** conflict-detection.md

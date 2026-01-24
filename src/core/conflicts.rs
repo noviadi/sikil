@@ -283,6 +283,30 @@ pub fn filter_error_conflicts(conflicts: &[Conflict]) -> Vec<&Conflict> {
         .collect()
 }
 
+/// Filters conflicts for display based on verbose mode
+///
+/// When verbose is false, this excludes `DuplicateManaged` conflicts (informational only).
+/// When verbose is true, all conflicts are included.
+///
+/// # Arguments
+///
+/// * `conflicts` - The conflicts to filter
+/// * `verbose` - Whether to include informational conflicts
+///
+/// # Returns
+///
+/// A vector containing conflicts that should be displayed
+pub fn filter_displayable_conflicts(conflicts: &[Conflict], verbose: bool) -> Vec<&Conflict> {
+    if verbose {
+        conflicts.iter().collect()
+    } else {
+        conflicts
+            .iter()
+            .filter(|c| c.conflict_type.is_error())
+            .collect()
+    }
+}
+
 /// Formats a conflict for human-readable display
 ///
 /// # Arguments
@@ -918,5 +942,99 @@ mod tests {
         let summary = format_conflicts_summary(&conflicts);
         assert!(summary.contains("2 errors"));
         assert!(summary.contains("1 info"));
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_verbose_false_excludes_managed() {
+        let conflicts = vec![
+            Conflict::new(
+                "error-skill".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "managed-skill".to_string(),
+                vec![],
+                ConflictType::DuplicateManaged,
+            ),
+        ];
+
+        let displayable = filter_displayable_conflicts(&conflicts, false);
+        assert_eq!(displayable.len(), 1);
+        assert_eq!(displayable[0].skill_name, "error-skill");
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_verbose_true_includes_all() {
+        let conflicts = vec![
+            Conflict::new(
+                "error-skill".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "managed-skill".to_string(),
+                vec![],
+                ConflictType::DuplicateManaged,
+            ),
+        ];
+
+        let displayable = filter_displayable_conflicts(&conflicts, true);
+        assert_eq!(displayable.len(), 2);
+        let names: Vec<_> = displayable.iter().map(|c| &c.skill_name).collect();
+        assert!(names.contains(&&"error-skill".to_string()));
+        assert!(names.contains(&&"managed-skill".to_string()));
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_verbose_false_only_managed_returns_empty() {
+        let conflicts = vec![
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
+        ];
+
+        let displayable = filter_displayable_conflicts(&conflicts, false);
+        assert_eq!(displayable.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_verbose_true_only_managed_includes_all() {
+        let conflicts = vec![
+            Conflict::new("info1".to_string(), vec![], ConflictType::DuplicateManaged),
+            Conflict::new("info2".to_string(), vec![], ConflictType::DuplicateManaged),
+        ];
+
+        let displayable = filter_displayable_conflicts(&conflicts, true);
+        assert_eq!(displayable.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_empty_conflicts() {
+        let conflicts: Vec<Conflict> = vec![];
+
+        let displayable_false = filter_displayable_conflicts(&conflicts, false);
+        assert_eq!(displayable_false.len(), 0);
+
+        let displayable_true = filter_displayable_conflicts(&conflicts, true);
+        assert_eq!(displayable_true.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_displayable_conflicts_verbose_false_only_unmanaged_includes_all() {
+        let conflicts = vec![
+            Conflict::new(
+                "error1".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+            Conflict::new(
+                "error2".to_string(),
+                vec![],
+                ConflictType::DuplicateUnmanaged,
+            ),
+        ];
+
+        let displayable = filter_displayable_conflicts(&conflicts, false);
+        assert_eq!(displayable.len(), 2);
     }
 }
