@@ -298,7 +298,8 @@ impl Cache for JsonCache {
             .insert(path_str.to_string(), CachedEntry::from(entry));
 
         // Write (non-fatal on failure)
-        self.write(&cache_file)
+        let _ = self.write(&cache_file);
+        Ok(())
     }
 
     fn invalidate(&self, path: &Path) -> Result<(), SikilError> {
