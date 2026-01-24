@@ -20,6 +20,9 @@ fi
 ITERATION=0
 CURRENT_BRANCH=$(git branch --show-current)
 
+# jq filter to extract streaming text from assistant messages and results
+STREAM_TEXT='select(.type == "assistant").message.content[]? | select(.type == "text").text // empty | gsub("\n"; "\r\n") | . + "\r\n\n"'
+
 # Validate git state
 if [ -z "$CURRENT_BRANCH" ]; then
     echo "Error: Not on a branch (detached HEAD?)"
@@ -42,6 +45,10 @@ else
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+tmpfile=""
+cleanup() { rm -f "$tmpfile"; }
+trap cleanup EXIT
+
 while true; do
     if [ $MAX_ITERATIONS -gt 0 ] && [ $ITERATION -ge $MAX_ITERATIONS ]; then
         echo "Reached max iterations: $MAX_ITERATIONS"
@@ -51,6 +58,9 @@ while true; do
     ITERATION=$((ITERATION + 1))
     echo -e "\n======================== ITERATION $ITERATION ========================\n"
 
+    # Temp file for raw output (cleaned up at end of iteration or on exit)
+    tmpfile=$(mktemp)
+
     # Run Claude iteration with selected prompt
     # -p: Headless mode (non-interactive, reads from stdin)
     # --dangerously-skip-permissions: Auto-approve all tool calls
@@ -59,18 +69,26 @@ while true; do
     if ! cat "$PROMPT_FILE" | claude -p \
         --dangerously-skip-permissions \
         --output-format=stream-json \
-        --verbose; then
+        --verbose \
+        | grep --line-buffered '^{' \
+        | tee "$tmpfile" \
+        | jq --unbuffered -rj "$STREAM_TEXT"; then
         echo "Error: Claude failed with exit code $?"
         exit 1
     fi
 
-    # Push changes after each iteration (skip if nothing to push)
-    if ! git diff --quiet HEAD @{u} 2>/dev/null; then
+    # Push changes after each iteration (if nothing to push, agent found no work)
+    if [ -n "$(git log --oneline @{u}..HEAD 2>/dev/null)" ]; then
         git push origin "$CURRENT_BRANCH" || {
             echo "Failed to push. Creating remote branch..."
             git push -u origin "$CURRENT_BRANCH"
         }
     else
-        echo "No new commits to push"
+        echo "No new commits to push after $ITERATION iteration(s)"
+        cleanup
+        break
     fi
+
+    # Clean up temp file before next iteration
+    cleanup
 done

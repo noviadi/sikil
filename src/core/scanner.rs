@@ -4,7 +4,7 @@
 //! Agent Skills, which are identified by the presence of SKILL.md files
 //! in subdirectories.
 
-use crate::core::cache::{Cache, ScanEntry, SqliteCache};
+use crate::core::cache::{Cache, JsonCache, ScanEntry};
 use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
@@ -236,7 +236,7 @@ pub struct Scanner {
     /// Configuration for agent paths
     config: Config,
     /// Optional cache for storing scan results
-    cache: Option<SqliteCache>,
+    cache: Option<JsonCache>,
     /// Whether to use the cache (can be disabled via --no-cache)
     use_cache: bool,
     /// Optional workspace root override (for testing; uses env::current_dir() if None)
@@ -250,7 +250,7 @@ impl Scanner {
     pub fn new(config: Config) -> Self {
         Self {
             config,
-            cache: SqliteCache::open().ok(),
+            cache: JsonCache::open().ok(),
             use_cache: true,
             workspace_root: None,
             repo_root: None,
@@ -260,7 +260,7 @@ impl Scanner {
     /// Creates a new Scanner with cache control
     pub fn with_cache(config: Config, use_cache: bool) -> Self {
         let cache = if use_cache {
-            SqliteCache::open().ok()
+            JsonCache::open().ok()
         } else {
             None
         };
@@ -391,21 +391,21 @@ impl Scanner {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
-    /// Gets the mtime for a directory path.
-    fn get_dir_mtime(path: &Path) -> Result<u64, SikilError> {
-        let metadata = fs::metadata(path).map_err(|_| SikilError::DirectoryNotFound {
-            path: path.to_path_buf(),
+    /// Gets the mtime for a SKILL.md file.
+    fn get_skill_md_mtime(skill_md_path: &Path) -> Result<u64, SikilError> {
+        let metadata = fs::metadata(skill_md_path).map_err(|_| SikilError::DirectoryNotFound {
+            path: skill_md_path.to_path_buf(),
         })?;
 
         let modified = metadata.modified().map_err(|_| SikilError::ConfigError {
-            reason: format!("unable to get mtime for {}", path.display()),
+            reason: format!("unable to get mtime for {}", skill_md_path.display()),
         })?;
 
         let duration_since_epoch =
             modified
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .map_err(|_| SikilError::ConfigError {
-                    reason: format!("mtime before unix epoch for {}", path.display()),
+                    reason: format!("mtime before unix epoch for {}", skill_md_path.display()),
                 })?;
 
         Ok(duration_since_epoch.as_secs())
@@ -594,11 +594,11 @@ impl Scanner {
         metadata: &Result<SkillMetadata, SikilError>,
     ) {
         if let Some(ref cache) = self.cache {
-            // Get mtime and size for cache invalidation
+            // Get mtime (from SKILL.md) and size for cache invalidation
             let (mtime, size, skill_name, is_valid_skill) = match metadata {
                 Ok(meta) => {
                     match (
-                        Self::get_dir_mtime(entry_path),
+                        Self::get_skill_md_mtime(skill_md_path),
                         Self::calculate_dir_size(entry_path),
                     ) {
                         (Ok(mt), Ok(sz)) => (mt, sz, Some(meta.name.clone()), true),
@@ -608,7 +608,7 @@ impl Scanner {
                 Err(_) => {
                     // For invalid entries, try to get mtime/size anyway
                     match (
-                        Self::get_dir_mtime(entry_path),
+                        Self::get_skill_md_mtime(skill_md_path),
                         Self::calculate_dir_size(entry_path),
                     ) {
                         (Ok(mt), Ok(sz)) => (mt, sz, None, false),
@@ -1883,6 +1883,9 @@ description: A cached skill
         )
         .unwrap();
 
+        // Create a test-specific cache file to avoid conflicts with concurrent tests
+        let test_cache_path = temp_dir.path().join("cache.json");
+
         let mut config = Config::new();
         config.insert_agent(
             "claude-code".to_string(),
@@ -1893,8 +1896,15 @@ description: A cached skill
             ),
         );
 
-        // Create scanner with cache enabled (default)
-        let scanner = Scanner::with_cache(config, true);
+        // Create scanner with test-specific cache
+        let test_cache = crate::core::cache::JsonCache::open_at(&test_cache_path).ok();
+        let scanner = Scanner {
+            config,
+            cache: test_cache,
+            use_cache: true,
+            workspace_root: None,
+            repo_root: None,
+        };
         let mut result = ScanResult::new();
 
         // First scan - should populate cache

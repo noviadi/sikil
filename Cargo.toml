@@ -15,7 +15,6 @@ serde_yaml = "0.9"
 serde_json = "1"
 toml = "0.8"
 walkdir = "2"
-rusqlite = { version = "0.31", features = ["bundled"] }
 anyhow = "1"
 thiserror = "1"
 anstream = "0.6"
