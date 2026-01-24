@@ -86,8 +86,9 @@ Constructors:
 | Function | Purpose |
 |----------|---------|
 | `format_conflict()` | Formats a single conflict with status indicator (✗ for error, ℹ for info), locations, and repo paths |
-| `format_conflicts_summary()` | Returns summary like "2 errors, 1 info" or "No conflicts detected" |
+| `format_conflicts_summary()` | Returns summary like "2 errors, 1 info suppressed" or "No conflicts detected". Accepts `verbose: bool` parameter. |
 | `filter_error_conflicts()` | Filters to return only error-level conflicts (DuplicateUnmanaged) |
+| `filter_displayable_conflicts()` | Filters conflicts for display based on verbose mode. When `verbose: false`, excludes `DuplicateManaged` conflicts. |
 
 ### Output Format
 
@@ -97,6 +98,59 @@ Constructors:
   Locations:
     1. claude-code (unmanaged) @ /path/to/skill
     2. windsurf (unmanaged) @ /another/path/to/skill
+```
+
+## Info Suppression
+
+`DuplicateManaged` conflicts are informational-only (normal behavior for managed skills installed to multiple agents). By default, these are suppressed from human-readable display to reduce noise.
+
+### Scope
+
+- **Human-readable output**: Suppression applies to `sikil list` terminal output
+- **JSON output**: All conflicts are included regardless of verbose mode (consumers can filter as needed)
+- **`--conflicts` filter**: Shows only error-level conflicts by default; with `-v`, also shows `DuplicateManaged` info
+
+### Behavior
+
+| Verbose Mode | Summary Fragment | Detail Display |
+|--------------|------------------|----------------|
+| `false` (default) | "N info suppressed" | Not shown |
+| `true` (`-v/--verbose`) | "N info" | Shown with full details |
+
+### Summary Format
+
+`format_conflicts_summary(verbose)` returns a fragment for the header line:
+
+| Conflicts Present | verbose=false | verbose=true |
+|-------------------|---------------|--------------|
+| None | "No conflicts detected" | "No conflicts detected" |
+| 2 errors only | "2 errors" | "2 errors" |
+| 3 info only | "3 info suppressed" | "3 info" |
+| 2 errors + 1 info | "2 errors, 1 info suppressed" | "2 errors, 1 info" |
+
+The list command prepends this to form: `Found N skills (X managed, Y unmanaged) - {summary}`
+
+### Rationale
+
+When a managed skill is installed to multiple agents (e.g., 5 agents), all symlinks point to the same repository location. This is expected behavior, not a problem. Showing detailed info for every such skill creates noise without actionable information.
+
+### Example Output
+
+**Default (verbose=false):**
+```
+Found 2 skills (1 managed, 1 unmanaged) - 1 info suppressed
+```
+
+**Verbose (verbose=true):**
+```
+Found 2 skills (1 managed, 1 unmanaged) - 1 info
+
+ℹ context7 (duplicate managed)
+  Multiple symlinks pointing to the same managed skill...
+  Locations:
+    1. windsurf (managed) @ /home/user/.custom/windsurf/skills/context7
+       → repo: /home/user/.sikil/repo/context7
+    ...
 ```
 
 ## Dependencies
@@ -117,13 +171,30 @@ Constructors:
 
 ## Acceptance Criteria
 
+### Conflict Detection
 - Multiple unmanaged installations with different paths create a `DuplicateUnmanaged` conflict
 - Multiple managed symlinks pointing to the same repo path create a `DuplicateManaged` conflict
 - `DuplicateUnmanaged` conflicts have `is_error()` returning `true`
 - `DuplicateManaged` conflicts have `is_error()` returning `false`
+- Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with repo path
+- Two managed installs are considered duplicates when their resolved `repo_path` is identical
+
+### Filtering
 - `filter_error_conflicts()` returns only `DuplicateUnmanaged` conflicts
+- `filter_displayable_conflicts()` with `verbose: false` excludes `DuplicateManaged` conflicts
+- `filter_displayable_conflicts()` with `verbose: true` includes all conflicts
+
+### Summary Formatting
+- `format_conflicts_summary(verbose: false)` shows "N info suppressed" for info-only conflicts
+- `format_conflicts_summary(verbose: true)` shows "N info" for info-only conflicts
 - `format_conflicts_summary()` returns "No conflicts detected" when no conflicts exist
-- `format_conflicts_summary()` returns "N errors, M info" format when conflicts exist
+- `format_conflicts_summary()` with mixed conflicts shows "N errors, M info suppressed" when not verbose
+- `format_conflicts_summary()` with mixed conflicts shows "N errors, M info" when verbose
+
+### Display Output
 - Conflict output shows `✗` indicator for error conflicts and `ℹ` for info conflicts
 - `recommendations()` returns resolution suggestions for unmanaged conflicts
-- Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with repo path
+- `DuplicateManaged` conflict details are not printed in human-readable output unless verbose mode is enabled
+- JSON output (`--json`) includes all conflicts regardless of verbose mode
+- `--conflicts` filter shows only error-level conflicts by default
+- `--conflicts -v` filter shows both error and info conflicts

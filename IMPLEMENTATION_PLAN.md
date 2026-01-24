@@ -105,3 +105,51 @@ None - all specs have complete Acceptance Criteria.
    - Binary size remains at ~3.3 MB (unchanged) because LTO was already eliminating unused rusqlite code
    - This task depends on: Replace SqliteCache with JsonCache, Update scanner to use JsonCache
    - Created `tests/build_test.rs` with automated test for binary size constraint (10MB limit per spec)
+
+### Add filter_displayable_conflicts function
+- **Spec:** conflict-detection.md
+- **Gap:** `filter_displayable_conflicts()` function defined in spec but does not exist in code
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `filter_displayable_conflicts()` with `verbose: false` excludes `DuplicateManaged` conflicts
+  - `filter_displayable_conflicts()` with `verbose: true` includes all conflicts
+- **Tests:**
+- **Location:** src/core/conflicts.rs
+- **Notes:**
+
+### Update format_conflicts_summary to accept verbose parameter
+- **Spec:** conflict-detection.md
+- **Gap:** Current `format_conflicts_summary()` takes only `&[Conflict]`, spec requires `verbose: bool` parameter to control "suppressed" text
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `format_conflicts_summary(verbose: false)` shows "N info suppressed" for info-only conflicts
+  - `format_conflicts_summary(verbose: true)` shows "N info" for info-only conflicts
+  - `format_conflicts_summary()` returns "No conflicts detected" when no conflicts exist
+  - `format_conflicts_summary()` with mixed conflicts shows "N errors, M info suppressed" when not verbose
+  - `format_conflicts_summary()` with mixed conflicts shows "N errors, M info" when verbose
+- **Tests:**
+- **Location:** src/core/conflicts.rs
+- **Notes:** Existing tests call `format_conflicts_summary(&conflicts)` without verbose param - need to update
+
+### Add verbose field to ListArgs and wire through CLI
+- **Spec:** conflict-detection.md
+- **Gap:** `ListArgs` struct lacks `verbose` field, CLI verbose flag not passed to list command
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `DuplicateManaged` conflict details are not printed in human-readable output unless verbose mode is enabled
+  - `--conflicts` filter shows only error-level conflicts by default
+  - `--conflicts -v` filter shows both error and info conflicts
+- **Tests:**
+- **Location:** src/commands/list.rs, src/main.rs
+- **Notes:** The global `-v/--verbose` flag already exists in cli/app.rs, just needs to be passed through
+
+### Suppress DuplicateManaged conflicts in human-readable output
+- **Spec:** conflict-detection.md
+- **Gap:** `print_human_readable()` prints all conflicts, should filter by verbose mode
+- **Completed:** false
+- **Acceptance Criteria:**
+  - `DuplicateManaged` conflict details are not printed in human-readable output unless verbose mode is enabled
+  - JSON output (`--json`) includes all conflicts regardless of verbose mode
+- **Tests:**
+- **Location:** src/commands/list.rs
+- **Notes:** Depends on: Add verbose field to ListArgs, Add filter_displayable_conflicts function
