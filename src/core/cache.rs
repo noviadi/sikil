@@ -380,6 +380,33 @@ mod tests {
         }
     }
 
+    /// Helper to assert no cache temp files exist in the parent directory.
+    /// Verifies that atomic write cleanup worked correctly.
+    fn assert_no_cache_tmp_files(cache_path: &Path) {
+        let parent = cache_path.parent().unwrap();
+        let base = cache_path.file_name().unwrap().to_string_lossy();
+        let prefix = format!("{base}.");
+
+        let leftovers: Vec<_> = fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .map(|n| {
+                        let n = n.to_string_lossy();
+                        n.starts_with(&prefix) && n.ends_with(".tmp")
+                    })
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        assert!(
+            leftovers.is_empty(),
+            "leftover cache tmp files found: {leftovers:?}"
+        );
+    }
+
     #[test]
     fn test_json_cache_open_creates_file() {
         let temp_dir = TempDir::new().unwrap();
@@ -643,9 +670,8 @@ mod tests {
 
         cache.put(&entry).unwrap();
 
-        // Verify temp file was cleaned up (should not exist)
-        let temp_path = cache_path.with_extension("tmp");
-        assert!(!temp_path.exists());
+        // Verify no leftover temp files with pattern cache.json.*.tmp
+        assert_no_cache_tmp_files(&cache_path);
 
         // Verify final cache file exists
         assert!(cache_path.exists());
