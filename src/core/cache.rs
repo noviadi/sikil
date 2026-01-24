@@ -212,8 +212,12 @@ impl JsonCache {
             reason: format!("failed to write cache temp file: {}", e),
         })?;
 
-        fs::rename(&temp_path, &self.cache_path).map_err(|e| SikilError::ConfigError {
-            reason: format!("failed to rename cache file: {}", e),
+        fs::rename(&temp_path, &self.cache_path).map_err(|e| {
+            // Clean up temp file on rename failure
+            let _ = fs::remove_file(&temp_path);
+            SikilError::ConfigError {
+                reason: format!("failed to rename cache file: {}", e),
+            }
         })?;
 
         Ok(())
