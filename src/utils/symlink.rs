@@ -200,22 +200,32 @@ pub fn resolve_realpath(path: &Path) -> Result<PathBuf, SikilError> {
 /// }
 /// ```
 pub fn is_managed_symlink(path: &Path) -> bool {
-    // First check if it's a symlink
     if !is_symlink(path) {
         return false;
     }
 
-    // Get the real path of the symlink target
     let target_real = match resolve_realpath(path) {
         Ok(p) => p,
-        Err(_) => return false,
+        Err(_) => return false, // broken symlink
     };
 
-    // Get the repo path
+    // Check global store (~/.sikil/repo/)
     let repo_path = super::paths::get_repo_path();
+    if target_real.starts_with(&repo_path) {
+        return true;
+    }
 
-    // Check if the target is under the repo path
-    target_real.starts_with(&repo_path)
+    // Check project store (<project_root>/.sikil/skills/)
+    if let Some(parent) = path.parent() {
+        if let Some(project_root) = super::paths::find_project_root(parent) {
+            let project_skills = super::paths::get_project_skills_path(&project_root);
+            if target_real.starts_with(&project_skills) {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -442,5 +452,94 @@ mod tests {
         // The link's target resolves to inside the repo
         let realpath = resolve_realpath(&link).unwrap();
         assert!(realpath.starts_with(&repo));
+    }
+
+    // --- v0.2 project store tests ---
+
+    #[test]
+    fn test_is_managed_symlink_project_store_with_manifest() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Create project structure with manifest
+        let sikil_dir = root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(
+            root.join(".sikil").join("manifest.toml"),
+            "schema_version = 1\n",
+        )
+        .unwrap();
+
+        // Create project skills store with a skill
+        let skill_dir = root.join(".sikil").join("skills").join("my-skill");
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), "# Test Skill").unwrap();
+
+        // Create symlink inside project pointing to project skills store
+        let link = root.join("skill-link");
+        std::os::unix::fs::symlink(&skill_dir, &link).unwrap();
+
+        assert!(is_managed_symlink(&link));
+    }
+
+    #[test]
+    fn test_is_managed_symlink_project_store_nested_location() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Create project structure with .git marker
+        fs::create_dir_all(root.join(".git")).unwrap();
+
+        // Create project skills store with a skill
+        let skill_dir = root.join(".sikil").join("skills").join("my-skill");
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), "# Test Skill").unwrap();
+
+        // Create symlink in a nested subdirectory within the project
+        let nested = root.join("src").join("components");
+        fs::create_dir_all(&nested).unwrap();
+        let link = nested.join("skill-link");
+        std::os::unix::fs::symlink(&skill_dir, &link).unwrap();
+
+        assert!(is_managed_symlink(&link));
+    }
+
+    #[test]
+    fn test_is_managed_symlink_outside_both_stores() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a skill outside both managed stores (no project markers)
+        let skill = temp_dir.path().join("other-skill");
+        fs::create_dir(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "# Test Skill").unwrap();
+
+        // Create symlink pointing outside both stores
+        let link = temp_dir.path().join("skill-link");
+        std::os::unix::fs::symlink(&skill, &link).unwrap();
+
+        assert!(!is_managed_symlink(&link));
+    }
+
+    #[test]
+    fn test_create_symlink_relative_src_verbatim() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a target directory
+        let target = temp_dir.path().join("target-dir");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("file.txt"), "content").unwrap();
+
+        // Create a subdirectory where the symlink will live
+        let link_dir = temp_dir.path().join("subdir");
+        fs::create_dir(&link_dir).unwrap();
+        let link = link_dir.join("link");
+
+        // Create symlink with a relative src path
+        let relative_src = Path::new("../target-dir");
+        create_symlink(relative_src, &link).unwrap();
+
+        // Read back the symlink target — should be the relative path verbatim
+        let read_target = read_symlink_target(&link).unwrap();
+        assert_eq!(read_target, PathBuf::from("../target-dir"));
     }
 }

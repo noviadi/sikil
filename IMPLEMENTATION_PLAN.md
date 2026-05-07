@@ -74,16 +74,16 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Recognize project store in is_managed_symlink and create_symlink
 - **Spec:** symlink-operations.md
 - **Gap:** `is_managed_symlink` only checks `~/.sikil/repo/`; spec requires it to also accept any reachable `<project_root>/.sikil/skills/`. `create_symlink` must record relative `src` verbatim for portable project symlinks.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `is_managed_symlink` returns true if symlink target is under `~/.sikil/repo/`
   - `is_managed_symlink` returns true if symlink target resolves to a path under `<project_root>/.sikil/skills/` for the project root reachable from the symlink's location
   - `is_managed_symlink` returns false for broken symlinks
   - `is_managed_symlink` returns false if symlink target is outside both managed stores
   - `create_symlink` with a relative `src` records that relative path verbatim as the symlink target
-- **Tests:**
+- **Tests:** src/utils/symlink.rs — `test_is_managed_symlink_project_store_with_manifest`, `test_is_managed_symlink_project_store_nested_location`, `test_is_managed_symlink_outside_both_stores`, `test_create_symlink_relative_src_verbatim`
 - **Location:** src/utils/symlink.rs
-- **Notes:** depends on filesystem-paths task (needs `find_project_root`, `get_project_skills_path`)
+- **Notes:** `create_symlink` already recorded relative paths verbatim (passes `src` directly to `std::os::unix::fs::symlink`); only `is_managed_symlink` needed updating. Project store check uses `find_project_root(parent)` from the symlink's parent directory to discover the project root, then checks if the resolved target starts with `<project_root>/.sikil/skills/`.
 
 ---
 
