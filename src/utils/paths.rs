@@ -140,6 +140,77 @@ pub fn ensure_dir_exists(path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+/// Walks upward from `start`, looking for a project root marker.
+///
+/// Returns the first directory containing `.sikil/manifest.toml` (preferred) or
+/// `.git` (file or directory, fallback). Returns `None` if no marker is found
+/// before reaching the filesystem root.
+///
+/// Manifest wins over `.git` regardless of depth — a full upward scan for
+/// manifest is performed first, and only if none is found does the function
+/// fall back to scanning for `.git`.
+pub fn find_project_root(start: &Path) -> Option<PathBuf> {
+    // First pass: look for .sikil/manifest.toml
+    let mut dir = if start.is_absolute() {
+        Some(start.to_path_buf())
+    } else {
+        std::env::current_dir()
+            .ok()?
+            .join(start)
+            .canonicalize()
+            .ok()
+    };
+
+    while let Some(d) = dir {
+        if d.join(".sikil").join("manifest.toml").exists() {
+            return Some(d);
+        }
+        dir = d.parent().map(|p| p.to_path_buf());
+    }
+
+    // Second pass: look for .git (file or directory)
+    let mut dir = if start.is_absolute() {
+        Some(start.to_path_buf())
+    } else {
+        std::env::current_dir()
+            .ok()?
+            .join(start)
+            .canonicalize()
+            .ok()
+    };
+
+    while let Some(d) = dir {
+        let git = d.join(".git");
+        if git.exists() {
+            return Some(d);
+        }
+        dir = d.parent().map(|p| p.to_path_buf());
+    }
+
+    None
+}
+
+/// Convenience wrapper around `find_project_root(env::current_dir()?)`.
+pub fn get_project_root() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    find_project_root(&cwd)
+}
+
+/// Returns `<project_root>/.sikil/manifest.toml`.
+pub fn get_manifest_path(project_root: &Path) -> PathBuf {
+    project_root.join(".sikil").join("manifest.toml")
+}
+
+/// Returns `<project_root>/.sikil/lock.toml`.
+pub fn get_lock_path(project_root: &Path) -> PathBuf {
+    project_root.join(".sikil").join("lock.toml")
+}
+
+/// Returns `<project_root>/.sikil/skills/`.
+pub fn get_project_skills_path(project_root: &Path) -> PathBuf {
+    project_root.join(".sikil").join("skills")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,7 +303,6 @@ mod tests {
         fs::remove_dir_all(temp_dir).ok();
     }
 
-    #[test]
     fn test_ensure_dir_exists_empty_path() {
         let empty_path = Path::new("");
         // Empty path should either succeed (no-op) or fail gracefully
@@ -241,5 +311,146 @@ mod tests {
         // We don't assert a specific result since behavior may vary
         // Just ensure it doesn't panic
         let _ = result;
+    }
+
+    // --- Project root discovery tests ---
+
+    #[test]
+    fn test_find_project_root_manifest_at_start() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let sikil_dir = root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "").unwrap();
+
+        let result = find_project_root(root);
+        assert_eq!(result, Some(root.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_manifest_walking_up() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let sikil_dir = root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "").unwrap();
+
+        let deep = root.join("a").join("b").join("c");
+        fs::create_dir_all(&deep).unwrap();
+
+        let result = find_project_root(&deep);
+        assert_eq!(result, Some(root.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_git_directory_fallback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let git_dir = root.join(".git");
+        fs::create_dir_all(&git_dir).unwrap();
+
+        let deep = root.join("subdir");
+        fs::create_dir_all(&deep).unwrap();
+
+        let result = find_project_root(&deep);
+        assert_eq!(result, Some(root.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_git_file_worktree() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        // .git as a plain file (worktree marker)
+        fs::write(root.join(".git"), "gitdir: /some/where").unwrap();
+
+        let deep = root.join("src");
+        fs::create_dir_all(&deep).unwrap();
+
+        let result = find_project_root(&deep);
+        assert_eq!(result, Some(root.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_manifest_preferred_over_git() {
+        // Manifest at deeper level, .git at shallower level — manifest wins
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // .git at root level
+        fs::create_dir_all(root.join(".git")).unwrap();
+
+        // manifest at root/a level
+        let mid = root.join("a");
+        let sikil_dir = mid.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "").unwrap();
+
+        let deep = mid.join("b").join("c");
+        fs::create_dir_all(&deep).unwrap();
+
+        let result = find_project_root(&deep);
+        assert_eq!(result, Some(mid.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_manifest_wins_over_git_regardless_of_depth() {
+        // .git at shallow level, manifest at deep level — manifest still wins
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // .git at root level
+        fs::create_dir_all(root.join(".git")).unwrap();
+
+        // manifest at root/x/y/z level
+        let deep_dir = root.join("x").join("y").join("z");
+        let sikil_dir = deep_dir.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "").unwrap();
+
+        // start from inside z
+        let start = deep_dir.join("sub");
+        fs::create_dir_all(&start).unwrap();
+
+        let result = find_project_root(&start);
+        // manifest wins even though .git was found first (closer to root)
+        assert_eq!(result, Some(deep_dir.to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_project_root_returns_none_when_no_markers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let deep = root.join("a").join("b");
+        fs::create_dir_all(&deep).unwrap();
+
+        let result = find_project_root(&deep);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_get_manifest_path() {
+        let root = Path::new("/tmp/myproject");
+        assert_eq!(
+            get_manifest_path(root),
+            PathBuf::from("/tmp/myproject/.sikil/manifest.toml")
+        );
+    }
+
+    #[test]
+    fn test_get_lock_path() {
+        let root = Path::new("/tmp/myproject");
+        assert_eq!(
+            get_lock_path(root),
+            PathBuf::from("/tmp/myproject/.sikil/lock.toml")
+        );
+    }
+
+    #[test]
+    fn test_get_project_skills_path() {
+        let root = Path::new("/tmp/myproject");
+        assert_eq!(
+            get_project_skills_path(root),
+            PathBuf::from("/tmp/myproject/.sikil/skills")
+        );
     }
 }

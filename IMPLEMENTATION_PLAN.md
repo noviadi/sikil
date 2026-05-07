@@ -42,7 +42,7 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Add project-root discovery utilities
 - **Spec:** filesystem-paths.md
 - **Gap:** `find_project_root`, `get_project_root`, `get_manifest_path`, `get_lock_path`, and `get_project_skills_path` do not exist in `src/utils/paths.rs`.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `find_project_root` returns the directory containing `.sikil/manifest.toml` when present, walking upward from the start path
   - `find_project_root` returns the directory containing `.git` (file or directory) when no manifest is found higher up
@@ -52,9 +52,9 @@ None - all specs reviewed have complete Acceptance Criteria.
   - `get_manifest_path` returns `<project_root>/.sikil/manifest.toml`
   - `get_lock_path` returns `<project_root>/.sikil/lock.toml`
   - `get_project_skills_path` returns `<project_root>/.sikil/skills/`
-- **Tests:**
+- **Tests:** src/utils/paths.rs — `test_find_project_root_manifest_at_start`, `test_find_project_root_manifest_walking_up`, `test_find_project_root_git_directory_fallback`, `test_find_project_root_git_file_worktree`, `test_find_project_root_manifest_preferred_over_git`, `test_find_project_root_manifest_wins_over_git_regardless_of_depth`, `test_find_project_root_returns_none_when_no_markers`, `test_get_manifest_path`, `test_get_lock_path`, `test_get_project_skills_path`
 - **Location:** src/utils/paths.rs
-- **Notes:**
+- **Notes:** `find_project_root` uses a two-pass algorithm: first pass scans for `.sikil/manifest.toml` at every level, second pass scans for `.git` (file or directory). This guarantees manifest wins regardless of depth. `get_project_root()` is a thin convenience wrapper; it is not separately unit-tested since it delegates entirely to `find_project_root`.
 
 ### Add atomic_write_file utility
 - **Spec:** atomic-operations.md
