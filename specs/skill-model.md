@@ -33,8 +33,10 @@ Represents a skill discovered on the filesystem.
 | `metadata` | `SkillMetadata` | Metadata from SKILL.md |
 | `directory_name` | `String` | Directory name (may differ from `metadata.name`) |
 | `installations` | `Vec<Installation>` | All installations across agents |
-| `is_managed` | `bool` | Whether skill exists in `~/.sikil/repo/` |
-| `repo_path` | `Option<PathBuf>` | Path in managed repo (if managed) |
+| `is_managed` | `bool` | Whether the skill exists in any managed store (global `~/.sikil/repo/` or any per-project `<project_root>/.sikil/skills/`) |
+| `repo_path` | `Option<PathBuf>` | Path in the canonical managed store (global repo or project store) when managed |
+
+When the same skill name appears in both a project store and the global repo, the scanner records both as separate installations of a single `Skill`; `repo_path` reflects the store that the project-managed installation resolves to (project takes precedence for path display). See [skill-scanner.md](skill-scanner.md) and [conflict-detection.md](conflict-detection.md).
 
 Methods:
 - `new()` - Creates skill with metadata and directory name
@@ -123,7 +125,7 @@ Parsing flow:
 - `SkillMetadata` with `None` version/author/license serializes without those fields
 - `Skill::is_orphan()` returns `true` when `installations` is empty
 - `Skill::is_orphan()` returns `false` when at least one installation exists
-- `Skill::with_repo(path)` sets `is_managed` to `true` and `repo_path` to `Some(path)`
+- `Skill::with_repo(path)` sets `is_managed` to `true` and `repo_path` to `Some(path)`; `path` may point under `~/.sikil/repo/` (global-managed) or `<project_root>/.sikil/skills/` (project-managed)
 - `Agent::all()` returns slice containing all 5 agent variants
 - `Agent::cli_name()` returns `"claude-code"` for `Agent::ClaudeCode`
 - `Agent::from_cli_name("amp")` returns `Some(Agent::Amp)`

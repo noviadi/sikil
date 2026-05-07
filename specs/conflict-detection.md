@@ -22,8 +22,9 @@ The `detect_conflicts()` function iterates through each skill in the `ScanResult
 1. **Group installations by management type**:
    - An installation is considered "managed" if:
      - `is_symlink == Some(true)` AND
-     - `symlink_target` starts with or equals the skill's `repo_path`
+     - `symlink_target` starts with or equals **either** the global repo path (`~/.sikil/repo/`) **or** any project-managed store path (`<project_root>/.sikil/skills/`) per [symlink-operations.md](symlink-operations.md)
    - Otherwise, it's "unmanaged"
+   - Project-managed and global-managed installations of the same skill are both "managed" but track distinct `repo_path` roots; they may co-exist without conflict
 
 2. **Detect DuplicateUnmanaged conflicts**:
    - If there are multiple unmanaged installations (>1)
@@ -176,8 +177,9 @@ Found 2 skills (1 managed, 1 unmanaged) - 1 info
 - Multiple managed symlinks pointing to the same repo path create a `DuplicateManaged` conflict
 - `DuplicateUnmanaged` conflicts have `is_error()` returning `true`
 - `DuplicateManaged` conflicts have `is_error()` returning `false`
-- Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with repo path
+- Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with the global repo path or the project-managed store path
 - Two managed installs are considered duplicates when their resolved `repo_path` is identical
+- A managed installation in `<project>/.sikil/skills/` and a managed installation in `~/.sikil/repo/` for the same skill name are not considered a conflict (they belong to different scopes)
 
 ### Filtering
 - `filter_error_conflicts()` returns only `DuplicateUnmanaged` conflicts

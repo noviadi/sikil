@@ -17,6 +17,7 @@ The atomic module provides safe, atomic filesystem operations for managing skill
 | `copy_skill_dir(src, dest) -> Result<(), SikilError>` | Deep copy excluding `.git` and rejecting symlinks |
 | `atomic_move_dir(src, dest) -> Result<(), SikilError>` | Atomic rename; falls back to copy+delete |
 | `safe_remove_dir(path, confirmed) -> Result<(), SikilError>` | Removes directory only if `confirmed=true` |
+| `atomic_write_file(path, contents) -> Result<(), SikilError>` | Writes `contents` to a sibling temp file, fsyncs, then renames over `path` |
 
 ## Behavior Notes
 
@@ -25,6 +26,7 @@ The atomic module provides safe, atomic filesystem operations for managing skill
 - `atomic_move_dir` tries `fs::rename` first (same filesystem), falls back to copy+remove
 - Cross-filesystem moves back up existing destination, restore on failure
 - `safe_remove_dir` requires explicit confirmation to prevent accidental deletions
+- `atomic_write_file` writes to `<path>.tmp.<random>` in the parent directory, calls `sync_all()` on the temp file before renaming, then `fs::rename`s over the destination; on any failure the temp file is removed and no change is made to the destination
 
 ## Acceptance Criteria
 
@@ -38,6 +40,12 @@ The atomic module provides safe, atomic filesystem operations for managing skill
 - `atomic_move_dir` restores existing destination on failure during cross-filesystem move
 - `safe_remove_dir` returns `SikilError::ValidationError` if `confirmed=false`
 - `safe_remove_dir` removes directory and all contents if `confirmed=true`
+- `atomic_write_file` writes to a sibling temp file in the destination's parent directory
+- `atomic_write_file` calls `sync_all()` on the temp file before renaming
+- `atomic_write_file` leaves the destination unchanged if the rename fails
+- `atomic_write_file` removes the temp file on any failure (no orphaned `.tmp.*` files)
+- `atomic_write_file` creates the parent directory if it does not exist
+- `atomic_write_file` returns `SikilError::PermissionDenied` when the destination directory is not writable
 
 ## Error Handling
 

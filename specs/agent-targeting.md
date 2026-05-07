@@ -87,6 +87,17 @@ When `--json` flag is active:
 
 This ensures non-interactive operation for scripting and automation.
 
+## Manifest-Driven Targeting (Project Scope)
+
+When operating in project scope, the manifest's per-skill `agents` field declared in `.sikil/manifest.toml` (per [project-manifest.md](project-manifest.md)) overrides interactive prompts and `--to` defaults:
+
+| Manifest entry | Behavior |
+|----------------|----------|
+| `agents = ["claude-code", "amp"]` | Symlinks created only at those agents' workspace paths |
+| `agents` field absent | Symlinks created at every enabled agent's workspace path |
+
+`--to` may still be passed explicitly to override manifest agents for a single operation (e.g., `sikil install --to claude-code` materializes only the claude-code symlink even if the manifest specifies more agents); the manifest itself is not modified by `--to`.
+
 ## Acceptance Criteria
 
 - `--to all` returns all enabled agents from config
@@ -103,6 +114,8 @@ This ensures non-interactive operation for scripting and automation.
 - Invalid number format returns `ValidationError` with "invalid selection format"
 - Out-of-range selection returns `ValidationError` with "invalid selection N"
 - JSON mode skips interactive prompt and defaults to all enabled agents
+- In project scope, the manifest's per-skill `agents` field is used as the targeting default, replacing the interactive prompt
+- `--to` overrides manifest `agents` for a single operation without modifying the manifest
 
 ## Dependencies
 

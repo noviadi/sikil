@@ -20,12 +20,14 @@ The symlink module provides utilities for creating, reading, and resolving symbo
 | `is_symlink(path) -> bool` | Checks if path is symlink using `symlink_metadata` |
 | `read_symlink_target(path) -> Result<PathBuf, SikilError>` | Returns symlink target (not resolved) |
 | `resolve_realpath(path) -> Result<PathBuf, SikilError>` | Canonicalizes path, following all symlinks |
-| `is_managed_symlink(path) -> bool` | Returns true if symlink target is under `~/.sikil/repo/` |
+| `is_managed_symlink(path) -> bool` | Returns true if symlink target is under `~/.sikil/repo/` or under any `<project_root>/.sikil/skills/` reachable by walking up from the symlink's parent directory |
 
 ## Behavior Notes
 
 - `create_symlink` removes existing file/symlink at dest before creating
+- `create_symlink` accepts both absolute and relative `src` paths; the symlink target is recorded verbatim (a relative `src` produces a relative symlink, important for portable project symlinks per [project-manifest.md](project-manifest.md))
 - `is_managed_symlink` returns false for broken symlinks
+- `is_managed_symlink` recognizes two managed-store roots: the global `~/.sikil/repo/` and any per-project `<project_root>/.sikil/skills/` reachable from the symlink's location by walking up to the nearest project root
 - `read_symlink_target` returns error if path is not a symlink
 
 ## Acceptance Criteria
@@ -39,8 +41,10 @@ The symlink module provides utilities for creating, reading, and resolving symbo
 - `read_symlink_target` returns `SikilError::SymlinkError` if path is not a symlink
 - `resolve_realpath` follows all symlinks and returns canonical absolute path
 - `is_managed_symlink` returns true if symlink target is under `~/.sikil/repo/`
+- `is_managed_symlink` returns true if symlink target resolves to a path under `<project_root>/.sikil/skills/` for the project root reachable from the symlink's location
 - `is_managed_symlink` returns false for broken symlinks
-- `is_managed_symlink` returns false if symlink target is outside `~/.sikil/repo/`
+- `is_managed_symlink` returns false if symlink target is outside both managed stores
+- `create_symlink` with a relative `src` records that relative path verbatim as the symlink target
 
 ## Error Handling
 
@@ -56,7 +60,7 @@ All functions return `Result<T, SikilError>` with:
 |-------|---------|
 | `std::os::unix::fs` | Unix symlink creation |
 
-Internal: `crate::core::errors::SikilError`, `crate::utils::paths::get_repo_path`
+Internal: `crate::core::errors::SikilError`, `crate::utils::paths::get_repo_path`, `crate::utils::paths::find_project_root`, `crate::utils::paths::get_project_skills_path`
 
 ## Used By
 

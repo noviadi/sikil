@@ -47,22 +47,46 @@ pub struct Cli {
 
 Mutual exclusivity: `--quiet` and `--verbose` cannot be used together (enforced in `main.rs`).
 
+## Scope Selection Flags
+
+The following flags are recognized on commands that operate on skills (`install`, `add`, `update`, `remove`, `adopt`, `unmanage`, `sync`, `list`, `show`):
+
+| Flag | Description |
+|------|-------------|
+| `--global` | Force global scope; bypass project-root discovery |
+| `--project` | Require project scope; error with `OutsideProject` if no project root is found |
+
+Without either flag, scope is determined by walking up from cwd to find `.sikil/manifest.toml` (preferred) or `.git` (fallback) per [project-manifest.md](project-manifest.md). If neither marker is found, the command runs in global scope. `--global` and `--project` are mutually exclusive.
+
 ## Commands Enum
 
 | Command | Description | Key Arguments |
 |---------|-------------|---------------|
-| `list` | List installed skills | `--agent`, `--managed`, `--unmanaged`, `--conflicts`, `--duplicates` |
-| `show` | Show skill details | `<name>` |
-| `install` | Install from path or Git URL | `<source>`, `--to` |
+| `list` | List installed skills | `--agent`, `--managed`, `--unmanaged`, `--conflicts`, `--duplicates`, `--global`, `--project` |
+| `show` | Show skill details | `<name>`, `--global`, `--project` |
+| `init` | Create `.sikil/manifest.toml` for the current project | `--here` |
+| `install` | With `<source>`: install from path or Git URL. Without args (project only): reconcile manifest+lockfile, materialize missing skills | `[<source>]`, `--to`, `--global`, `--project`, `--yes` |
+| `add` | Add a skill to the project manifest (requires project scope); sugar for `install <source> --project` | `<source>`, `--to`, `--rev`, `--subdir` |
+| `update` | Re-resolve and re-vendor manifest entries | `[<name>...]`, `--dry-run`, `--yes`, `--global`, `--project` |
 | `validate` | Validate SKILL.md | `<path>` |
-| `adopt` | Adopt unmanaged skill | `<name>`, `--from` |
-| `unmanage` | Convert to unmanaged | `<name>`, `--agent`, `--yes` |
-| `remove` | Remove installed skill | `<name>`, `--agent`, `--all`, `--yes` |
-| `sync` | Sync skill to agents | `<name>`, `--all`, `--to` |
+| `adopt` | Adopt unmanaged skill (project: into `.sikil/skills/`; global: into `~/.sikil/repo/`) | `<name>`, `--from`, `--global`, `--project` |
+| `unmanage` | Convert managed skill to unmanaged copies | `<name>`, `--agent`, `--yes`, `--global`, `--project` |
+| `remove` | Remove installed skill (project: also remove manifest+lockfile entry + vendored bytes) | `<name>`, `--agent`, `--all`, `--yes`, `--global`, `--project` |
+| `sync` | Sync managed skill to agents missing the symlink | `<name>`, `--all`, `--to`, `--global`, `--project` |
 | `config` | Manage configuration | `--edit`, `--set` |
 | `completions` | Generate shell completions | `<shell>`, `--output` |
 
 Each command includes `after_help` examples in the source.
+
+### Command-Specific Notes
+
+- `sikil install` with no `<source>` argument is only valid in project scope (returns `OutsideProject` otherwise). It performs manifest reconciliation per [project-manifest.md](project-manifest.md).
+- `sikil add` always requires project scope; returns `OutsideProject` if no project is found.
+- `sikil add --rev <ref>` overrides the default `rev = "main"` when writing the manifest entry.
+- `sikil add --subdir <path>` records `subdir = "<path>"` in the manifest entry.
+- `sikil update` with no positional names re-resolves every manifest entry; with positional names, only the named entries.
+- `sikil update --dry-run` prints the diff summary without modifying any files.
+- `sikil init --here` creates the manifest at cwd; without `--here`, creates it at the discovered git root.
 
 ## Built-in Flags
 
@@ -98,6 +122,11 @@ if let Err(e) = execute_command(args, &config) {
 - `sikil --help` prints usage information and exits with code 0
 - `sikil -v -q` exits with non-zero code due to mutual exclusivity
 - `--json` flag is available on all subcommands (global option)
+- `--global` and `--project` flags are available on `install`, `add`, `update`, `remove`, `adopt`, `unmanage`, `sync`, `list`, `show`
+- `--global` and `--project` together returns argument-parser error
+- `sikil install` with no source argument outside any project returns `OutsideProject` (exit code 2)
+- `sikil add` outside any project returns `OutsideProject` (exit code 2)
+- `sikil init` succeeds in any directory and creates `.sikil/manifest.toml` with `schema_version = 1`
 - Unknown subcommand prints error to stderr and exits with non-zero code
 - Missing required argument prints error with usage hint to stderr
 - Validation error exits with code 2

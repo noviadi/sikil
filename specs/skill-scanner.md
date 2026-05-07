@@ -11,19 +11,22 @@ The `Scanner` struct in [`src/core/scanner.rs`](file:///home/noviadi/Development
 ## Scanning Algorithm
 
 1. Create a `ScanResult` to accumulate discoveries
-2. Iterate through all enabled agents in the config
-3. For each agent, scan its global path (if exists)
-4. For each agent, scan its workspace path relative to current directory (if exists)
-5. Scan the managed skills repository (`~/.sikil/repo/`)
-6. Merge duplicate skill names, aggregating their installations
+2. Resolve `project_root` via `find_project_root(cwd)` (per [filesystem-paths.md](filesystem-paths.md)); may be `None`
+3. Iterate through all enabled agents in the config
+4. For each agent, scan its global path (if exists)
+5. For each agent, scan its workspace path relative to `project_root` (if `project_root` is set), otherwise relative to cwd (if exists)
+6. If `project_root` is set, scan the project-managed store at `<project_root>/.sikil/skills/`
+7. Scan the global managed skills repository (`~/.sikil/repo/`)
+8. Merge duplicate skill names, aggregating their installations
 
 ## Directory Traversal
 
 Directories are scanned in this order:
 
 1. **Global paths** for each enabled agent (e.g., `~/.claude/skills`, `~/.codeium/windsurf/skills`)
-2. **Workspace paths** relative to current working directory (e.g., `.claude/skills`, `.windsurf/skills`)
-3. **Managed repository** at `~/.sikil/repo/`
+2. **Workspace paths** for each enabled agent, anchored at `project_root` if discovered or cwd otherwise (e.g., `<project_root>/.claude/skills`)
+3. **Project-managed store** at `<project_root>/.sikil/skills/` (only when `project_root` is set)
+4. **Global managed repository** at `~/.sikil/repo/`
 
 Within each directory, the scanner:
 - Reads all directory entries via `fs::read_dir`
@@ -53,12 +56,12 @@ For each directory entry, the scanner:
 1. Checks if the entry is a symlink via `file_type.is_symlink()`
 2. If symlink, reads the target with `read_symlink_target()`
 3. Classifies the installation type:
-   - **Managed**: Symlink target resolves to a path under `~/.sikil/repo/`
+   - **Managed**: Symlink target resolves to a path under `~/.sikil/repo/` **or** under any `<project_root>/.sikil/skills/` reachable from the symlink's location (per [symlink-operations.md](symlink-operations.md))
    - **Unmanaged**: Physical directory (not a symlink)
    - **BrokenSymlink**: Symlink target does not exist
-   - **ForeignSymlink**: Symlink points outside `~/.sikil/repo/`
+   - **ForeignSymlink**: Symlink points outside both managed stores
 
-Classification uses `resolve_realpath()` to canonicalize the symlink target before checking the repo path prefix.
+Classification uses `resolve_realpath()` to canonicalize the symlink target before checking the managed-store prefixes. Project-managed and global-managed installations are both `Managed` for conflict-detection purposes but track distinct `repo_path` values (the canonical store under which the symlink target lives).
 
 ## Error Handling
 
@@ -83,6 +86,10 @@ All errors are non-fatal; the scanner processes all accessible paths and returns
 - Scan iterates global paths before workspace paths for each agent
 - Duplicate skill names across directories are merged into a single skill with multiple installations
 - Physical directories (not symlinks) are classified as unmanaged
+- When invoked inside a project root, workspace paths are anchored at the project root rather than cwd
+- When invoked inside a project root, the project-managed store at `<project_root>/.sikil/skills/` is included in the scan
+- Symlinks pointing into `<project_root>/.sikil/skills/` are classified as managed (project-managed)
+- A skill present in both the project-managed store and the global repo appears as a single skill with installations from both scopes
 
 ## Dependencies
 
@@ -95,6 +102,8 @@ All errors are non-fatal; the scanner processes all accessible paths and returns
 | `symlink::read_symlink_target` | Reads raw symlink target path |
 | `symlink::resolve_realpath` | Canonicalizes symlink to absolute path |
 | `paths::get_repo_path` | Returns `~/.sikil/repo/` path |
+| `paths::find_project_root` | Discovers project root for workspace anchoring and project-managed store inclusion |
+| `paths::get_project_skills_path` | Returns `<project_root>/.sikil/skills/` path |
 
 ## Used By
 

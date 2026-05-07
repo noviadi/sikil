@@ -16,12 +16,15 @@ This directory contains specification documents for each distinct topic of conce
 | Conflict Detection | [conflict-detection.md](conflict-detection.md) | Identifies duplicate skills across installations |
 | Skill Validation | [skill-validation.md](skill-validation.md) | Verifies skill directories conform to SKILL.md specification |
 | **Skill Management** | | |
-| Skill Installation | [skill-installation.md](skill-installation.md) | Copies skills to managed repository via symlinks |
-| Skill Adoption | [skill-adoption.md](skill-adoption.md) | Moves unmanaged skills into managed repository |
+| Skill Installation | [skill-installation.md](skill-installation.md) | Copies skills into a managed store via symlinks |
+| Skill Adoption | [skill-adoption.md](skill-adoption.md) | Moves unmanaged skills into a managed store |
 | Skill Removal | [skill-removal.md](skill-removal.md) | Deletes skills from agent directories |
 | Skill Unmanagement | [skill-unmanagement.md](skill-unmanagement.md) | Converts managed skills back to standalone copies |
 | Skill Synchronization | [skill-synchronization.md](skill-synchronization.md) | Creates missing symlinks for managed skills |
 | Agent Targeting | [agent-targeting.md](agent-targeting.md) | Selects enabled agents for multi-agent operations |
+| **Project Scope** | | |
+| Project Manifest | [project-manifest.md](project-manifest.md) | Tracks a project's skill dependencies through manifest + lockfile |
+| Provenance | [provenance.md](provenance.md) | Records the source origin of every managed skill |
 | **Infrastructure** | | |
 | CLI Schema | [cli-schema.md](cli-schema.md) | Defines command-line arguments for all commands |
 | CLI Output | [cli-output.md](cli-output.md) | Controls terminal formatting for user feedback |
@@ -57,6 +60,9 @@ specs/ssot/
 │   ├── skill-unmanagement.md   → src/commands/unmanage.rs
 │   ├── skill-synchronization.md → src/commands/sync.rs
 │   └── agent-targeting.md      → src/commands/agent_selection.rs
+├── Project Scope
+│   ├── project-manifest.md     → src/core/manifest.rs, src/commands/{init,add,update}.rs
+│   └── provenance.md           → src/core/provenance.rs
 ├── Infrastructure
 │   ├── cli-schema.md           → src/cli/app.rs
 │   ├── cli-output.md           → src/cli/output.rs

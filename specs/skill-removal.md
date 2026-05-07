@@ -20,10 +20,12 @@ The `remove` command deletes skill installations from agent directories, with th
 ## Behavior
 
 - Requires either `--agent` or `--all` (no default behavior)
-- With `--agent`: Removes symlinks/directories only from specified agents; repository entry is preserved unless orphaned
-- With `--all`: Removes all installations AND deletes the skill from the repository
+- With `--agent`: Removes symlinks/directories only from specified agents; canonical store entry is preserved unless orphaned
+- With `--all`: Removes all installations AND deletes the skill from the canonical store (project store and/or global repo, depending on scope of each installation)
 - Supports both managed skills (symlinks) and unmanaged skills (physical directories)
-- Detects orphaned repository entries after `--agent` removal and prompts to delete them
+- In project scope, `--all` also removes the `[skill.<name>]` entry from `.sikil/manifest.toml` and `.sikil/lock.toml` and deletes `<project_root>/.sikil/skills/<name>/`
+- In global scope, `--all` removes `~/.sikil/repo/<name>/` (including its `.sikil-source.toml` sidecar)
+- Detects orphaned canonical-store entries after `--agent` removal and prompts to delete them; project-managed orphans clean manifest+lockfile entries, global-managed orphans clean the sidecar implicitly with the directory
 
 ## Confirmation
 
@@ -43,23 +45,28 @@ Uses an interactive confirmation prompt with `[y/N]` format.
 
 1. Validate that `--agent` or `--all` is specified
 2. Parse `--agent` string into list of `Agent` values if provided
-3. Scan all agent directories to find skill installations by name
-4. Filter installations to those matching target agents
-5. Display what will be removed
-6. Prompt for confirmation (unless `--yes` or `--json`)
-7. For each installation:
+3. Resolve scope (project default in project root; `--global`/`--project` overrides)
+4. Scan all agent directories to find skill installations by name (per [skill-scanner.md](skill-scanner.md))
+5. Filter installations to those matching target agents
+6. Display what will be removed (with scope annotation per installation)
+7. Prompt for confirmation (unless `--yes` or `--json`)
+8. For each installation:
    - If symlink: call `fs::remove_file()`
    - If directory: call `fs::remove_dir_all()`
-8. If `--agent` was used and repository is now orphaned (no remaining installations):
-   - Prompt to delete orphaned repository entry
-9. If `--all` and skill was managed:
-   - Delete skill directory from repository using `safe_remove_dir()`
+9. If `--agent` was used and a canonical-store entry is now orphaned:
+   - Prompt to delete; on confirmation, perform the appropriate cleanup below
+10. If `--all` (or after orphan-cleanup confirmation):
+    - **Project-managed skill:** atomically rewrite `.sikil/manifest.toml` and `.sikil/lock.toml` removing the `[skill.<name>]` entry; remove `<project_root>/.sikil/skills/<name>/` with `safe_remove_dir(_, true)`
+    - **Global-managed skill:** remove `~/.sikil/repo/<name>/` (including its `.sikil-source.toml` sidecar) with `safe_remove_dir(_, true)`
 
 ## Acceptance Criteria
 
-- `--all` removes skill from all agents AND deletes from repository
-- `--agent` removes only from specified agents; repository entry is preserved
+- `--all` removes skill from all agents AND deletes from the canonical store
+- `--agent` removes only from specified agents; canonical-store entry is preserved unless orphaned
 - Both managed (symlinks) and unmanaged (directories) skills can be removed
+- In project scope, `--all` removes the `[skill.<name>]` manifest entry, the lockfile entry, and the vendored bytes at `<project_root>/.sikil/skills/<name>/`
+- In global scope, `--all` removes `~/.sikil/repo/<name>/` including its `.sikil-source.toml` sidecar
+- Manifest and lockfile rewrites use atomic temp + rename; a crash mid-write leaves the prior file intact
 - Missing both `--agent` and `--all` returns `ValidationError`
 - Invalid agent name returns `ValidationError`
 - Skill not found returns `SkillNotFound` error
@@ -68,7 +75,8 @@ Uses an interactive confirmation prompt with `[y/N]` format.
 - `--json` mode skips confirmation prompt
 - Empty input at confirmation prompt cancels operation
 - User entering `n` or `N` cancels operation with `PermissionDenied` error
-- Orphaned repository entry after `--agent` removal triggers deletion prompt
+- Orphaned canonical-store entry after `--agent` removal triggers deletion prompt
+- Orphan cleanup in project scope removes manifest and lockfile entries
 
 ## Error Conditions
 
@@ -93,7 +101,11 @@ Uses an interactive confirmation prompt with `[y/N]` format.
 | `crate::core::scanner::Scanner` | Scan agent directories to find skill installations |
 | `crate::core::skill::Agent` | Agent enum with `from_cli_name()` parsing |
 | `crate::utils::atomic::safe_remove_dir` | Safe directory removal |
-| `crate::utils::paths::get_repo_path` | Get managed repository path (`~/.sikil/repo/`) |
+| `crate::utils::atomic::atomic_write_file` | Atomic manifest/lockfile rewrites when removing entries |
+| `crate::utils::paths::get_repo_path` | Get global managed repository path (`~/.sikil/repo/`) |
+| `crate::utils::paths::find_project_root` | Discover project root for project-managed skills |
+| `crate::utils::paths::get_project_skills_path` | Get `<project_root>/.sikil/skills/` path |
+| Manifest layer | per [project-manifest.md](project-manifest.md) | Manifest+lockfile entry removal (project scope) |
 | `fs-err` | Enhanced filesystem operations with better error messages |
 
 ## Used By

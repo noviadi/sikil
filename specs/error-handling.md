@@ -30,6 +30,11 @@ Sikil uses a two-tier error handling strategy:
 | `SymlinkNotAllowed` | `reason: String` | `"Symlink not allowed: {reason}"` |
 | `InvalidGitUrl` | `url: String`, `reason: String` | `"Invalid Git URL: {url} - {reason}"` |
 | `ConfigTooLarge` | `size: u64` | `"Configuration file too large: {size} bytes (maximum 1048576 bytes)"` |
+| `ManifestNotFound` | `path: PathBuf` | `"Manifest not found at {path}"` |
+| `ManifestParseError` | `path: PathBuf`, `reason: String` | `"Invalid manifest at {path}: {reason}"` |
+| `LockfileMismatch` | `reason: String` | `"Lockfile mismatch: {reason}"` |
+| `OutsideProject` | (none) | `"No project found; run `sikil init` or use --global"` |
+| `SourceUnreachable` | `source: String`, `reason: String` | `"Source unreachable: {source} - {reason}"` |
 
 ### ConfigError (Configuration-Specific)
 
@@ -87,6 +92,16 @@ eprintln!("Valid agents: {}", Agent::all().iter().map(|a| a.cli_name()).collect:
 - `SikilError::SymlinkNotAllowed` displays `"Symlink not allowed: {reason}"`
 - `SikilError::InvalidGitUrl` displays `"Invalid Git URL: {url} - {reason}"`
 - `SikilError::ConfigTooLarge` displays `"Configuration file too large: {size} bytes (maximum 1048576 bytes)"`
+- `SikilError::ManifestNotFound` displays `"Manifest not found at {path}"`
+- `SikilError::ManifestParseError` displays `"Invalid manifest at {path}: {reason}"`
+- `SikilError::LockfileMismatch` displays `"Lockfile mismatch: {reason}"`
+- `SikilError::OutsideProject` displays the literal `"No project found; run \`sikil init\` or use --global"`
+- `SikilError::SourceUnreachable` displays `"Source unreachable: {source} - {reason}"`
+- `SikilError::ManifestNotFound` exits with code 3 (analogous to `SkillNotFound`)
+- `SikilError::ManifestParseError` exits with code 2 (validation)
+- `SikilError::LockfileMismatch` exits with code 2 (validation)
+- `SikilError::OutsideProject` exits with code 2 (validation)
+- `SikilError::SourceUnreachable` exits with code 5 (network) for git sources, code 3 for missing local paths
 - `ConfigError::FileRead` displays `"Failed to read config file: {0}"`
 - `ConfigError::InvalidToml` displays `"Invalid TOML in config: {0}"`
 - `ConfigError::ConfigTooLarge` displays `"Configuration file too large: {0} bytes (maximum 1048576 bytes)"`
