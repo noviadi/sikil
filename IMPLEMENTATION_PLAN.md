@@ -10,6 +10,75 @@ None - all specs have complete Acceptance Criteria.
 
 ## Tasks
 
+### Rewrite PRD.md and TRD.md from specs (v2.0)
+- **Spec:** N/A (documentation task)
+- **Gap:** PRD v1.1 and TRD v1.0 contained drift versus the SSOT specs (cache backend, Git URL formats, dependencies, multiple unspec'd behaviors). AGENTS.md states `specs/` are the source of truth.
+- **Completed:** true
+- **Acceptance Criteria:**
+  - Old `docs/PRD.md` and `docs/TRD.md` archived under `docs/archive/` with their original version stamps
+  - Old `docs/use_cases.md`, `docs/implementation_roadmap.md`, `docs/traceability_matrix.md` archived under `docs/archive/`
+  - New `docs/PRD.md` (v2.0) regenerated from `specs/`, with product framing (Executive Summary, Problem Statement, Personas, Goals, Risks) preserved from v1.1
+  - New `docs/TRD.md` (v2.0) regenerated from `specs/`, with engineering framing (Goals & Constraints, Risks, Open Questions) preserved
+  - `README.md` factual claims about cache backend updated (SQLite → JSON file)
+  - `docs/archive/README.md` documents the archived snapshots
+  - `./scripts/verify.sh` still passes (no code changes)
+- **Tests:** N/A
+- **Location:** docs/PRD.md, docs/TRD.md, docs/archive/, README.md, IMPLEMENTATION_PLAN.md
+- **Notes:**
+  - Source-of-truth policy: `specs/` win. PRD/TRD reflect specs + current implementation.
+  - v2.0 inline revision history in each new doc summarizes the categories of change.
+  - Spec gaps discovered during the rewrite are filed as separate pending tasks below.
+
+### Spec coding-practices/binary-benchmark stale SQLite references
+- **Spec:** N/A (process docs)
+- **Gap:** `docs/coding-practices.md` and `docs/binary-benchmark.md` still mention SQLite cache in places, even though the active cache is JSON file (per `specs/cache.md`).
+- **Completed:** false
+- **Acceptance Criteria:**
+  - Stale "SQLite Cache" section in `docs/coding-practices.md` either removed or rewritten to describe the JSON cache contract
+  - Historical entries in `docs/binary-benchmark.md` that reference SQLite are clearly marked as historical / pre-v0.1.0
+- **Tests:** N/A
+- **Location:** docs/coding-practices.md, docs/binary-benchmark.md
+- **Notes:**
+  - Out of scope for the v2.0 PRD/TRD rewrite (those are operational/process docs, not product docs).
+  - Coordinate with whoever owns those guides before editing.
+
+### Workspace-scope target for install/sync
+- **Spec:** skill-installation.md, skill-synchronization.md
+- **Gap:** Both `install` and `sync` always target `agent_config.global_path`. The data model has `Scope::Workspace` and the scanner reads workspace paths, but there is no CLI flag to write to the workspace path.
+- **Completed:** false
+- **Acceptance Criteria:**
+  - Specs declare whether workspace-scope writes are in scope and, if so, the CLI surface (likely `--scope workspace`)
+  - If yes: implementation creates symlink under `agent_config.workspace_path` instead of `global_path`
+  - If no: spec explicitly notes workspace-scope writes are intentionally unsupported
+- **Tests:** TBD
+- **Location:** specs/skill-installation.md, specs/skill-synchronization.md, src/commands/install.rs, src/commands/sync.rs
+- **Notes:**
+  - Surfaced during PRD/TRD rewrite. Currently absent from both PRD and TRD.
+
+### Locking policy for concurrent Sikil invocations
+- **Spec:** Cross-cutting (cache.md mentions last-writer-wins, but install/adopt/unmanage/remove have no policy)
+- **Gap:** Two concurrent `sikil install` runs targeting the same skill name can race on `~/.sikil/repo/<name>/` and on agent symlink directories. No spec addresses this.
+- **Completed:** false
+- **Acceptance Criteria:**
+  - A new spec section (or new spec) defines the locking/serialization policy
+  - Implementation adheres to the policy (e.g., `~/.sikil/.lock` flock, or documented "user must serialize" with no mitigation)
+- **Tests:** TBD
+- **Location:** specs/, src/commands/install.rs, src/commands/adopt.rs, src/commands/unmanage.rs, src/commands/remove.rs
+- **Notes:**
+  - Surfaced during PRD/TRD rewrite. Currently TRD §14 lists this as an Open Question.
+
+### Adoption disambiguation between global and workspace installations
+- **Spec:** skill-adoption.md
+- **Gap:** `--from <agent>` does not distinguish between an unmanaged skill at the agent's global path versus the same agent's workspace path.
+- **Completed:** false
+- **Acceptance Criteria:**
+  - Spec defines the disambiguation behavior (likely `--scope global|workspace` flag, or "global wins" rule, or rejection)
+  - Implementation matches
+- **Tests:** TBD
+- **Location:** specs/skill-adoption.md, src/commands/adopt.rs
+- **Notes:**
+  - Surfaced during PRD/TRD rewrite. May not be a real-world issue if workspace-scope is rare.
+
 ### Enable test_exit_code_network_error test
 - **Spec:** cli-schema.md
 - **Gap:** `test_exit_code_network_error` test was marked as `#[ignore]` but Git URL detection is now implemented

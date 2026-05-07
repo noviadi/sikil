@@ -104,7 +104,7 @@ Sikil is built as a **single binary CLI tool** in Rust, organized into four dist
 ~/.sikil/
 ├── repo/              # Managed skills (canonical copies)
 ├── config.toml        # Agent path configuration
-└── cache.db           # SQLite cache for fast scans
+└── cache.json         # JSON file cache for fast scans
 ```
 
 Agent directories contain symlinks pointing to `~/.sikil/repo/`:
@@ -380,7 +380,7 @@ Several commands support structured JSON output with `--json` flag:
 - **Language**: Rust 2021 edition (1.75+)
 - **CLI Framework**: clap 4
 - **Serialization**: serde + serde_yaml
-- **Caching**: rusqlite (SQLite)
+- **Caching**: JSON file (`serde_json`) at `~/.sikil/cache.json`
 - **Platforms**: macOS (Intel + ARM), Linux (x86_64 + aarch64)
 
 ## Performance
@@ -394,7 +394,7 @@ Sikil is designed for speed with built-in caching and efficient filesystem opera
 | `sikil show` | <200ms | ~10ms |
 | `sikil validate` | <100ms | ~7ms |
 
-**Caching**: Sikil uses SQLite caching to avoid redundant filesystem scans. Cache is automatically invalidated based on file modification times and sizes. Use `--no-cache` to bypass cache for any command.
+**Caching**: Sikil uses a JSON file cache at `~/.sikil/cache.json` (capped at 15 MB; atomic writes via temp file + rename) to avoid redundant filesystem scans. Cache entries are invalidated when the underlying `SKILL.md` file's modification time changes. Use `--no-cache` to bypass cache for any command.
 
 **Optimization Tips**:
 - First run after installation will be slower due to cache population
