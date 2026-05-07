@@ -6,6 +6,7 @@ pub mod conflicts;
 pub mod errors;
 pub mod manifest;
 pub mod parser;
+pub mod provenance;
 pub mod scanner;
 pub mod skill;
 

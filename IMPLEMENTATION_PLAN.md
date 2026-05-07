@@ -125,7 +125,7 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Implement provenance sidecar layer
 - **Spec:** provenance.md
 - **Gap:** No `src/core/provenance.rs` (or equivalent) implementing sidecar read/write, content-hash computation, or unknown-origin classification.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - After `sikil install <source> --global`, `~/.sikil/repo/<name>/.sikil-source.toml` exists with all required fields populated
   - `source` field in the sidecar matches verbatim the argument passed to `sikil install`
@@ -148,9 +148,9 @@ None - all specs reviewed have complete Acceptance Criteria.
   - Sidecar excluded from `content_hash` computation (the hash is stable across reads even if the sidecar changes timestamp)
   - `.git/` directory excluded from `content_hash` computation at any depth
   - Content hash computed for the same skill bytes is identical between global sidecar and project lockfile
-- **Tests:**
+- **Tests:** src/core/provenance.rs — `test_load_sidecar_valid`, `test_load_sidecar_missing_returns_none`, `test_load_sidecar_unsupported_version`, `test_load_sidecar_unknown_fields`, `test_load_sidecar_invalid_toml`, `test_save_and_load_sidecar_roundtrip`, `test_save_sidecar_atomic`, `test_save_sidecar_overwrites_existing`, `test_sidecar_path_helper`, `test_content_hash_excludes_sidecar`, `test_content_hash_identical_to_manifest_hash`, `test_now_rfc3339_format`, `test_installer_version_format`, `test_sidecar_local_path_source_empty_commit`, `test_sidecar_source_preserved_verbatim`
 - **Location:** src/core/provenance.rs (new)
-- **Notes:** Some AC bullets are observed via `show`, `list --json`, and `update` — those commands must be updated to read the sidecar. The wiring is part of the consumer command tasks below; this task implements the read/write/hash core.
+- **Notes:** Core read/write/validation layer complete. Command-wiring AC (show, list --json, update, install warning) are deferred to their respective command tasks. `save_sidecar` returns `SikilError` so callers can treat it as non-fatal (warning) or fatal. Content hash reuses `compute_content_hash` from manifest.rs, guaranteeing hash identity between global sidecar and project lockfile. Added `chrono = "0.4"` dependency for RFC 3339 timestamp generation.
 
 ---
 
