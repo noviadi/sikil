@@ -64,6 +64,26 @@ pub enum SikilError {
     /// Configuration file exceeds maximum size
     #[error("Configuration file too large: {size} bytes (maximum 1048576 bytes)")]
     ConfigTooLarge { size: u64 },
+
+    /// Manifest file not found
+    #[error("Manifest not found at {path}")]
+    ManifestNotFound { path: PathBuf },
+
+    /// Manifest file could not be parsed
+    #[error("Invalid manifest at {path}: {reason}")]
+    ManifestParseError { path: PathBuf, reason: String },
+
+    /// Lockfile content does not match expected state
+    #[error("Lockfile mismatch: {reason}")]
+    LockfileMismatch { reason: String },
+
+    /// Operation requires a project root but none was found
+    #[error("No project found; run `sikil init` or use --global")]
+    OutsideProject,
+
+    /// Source could not be reached (git URL or local path)
+    #[error("Source unreachable: {src} - {reason}")]
+    SourceUnreachable { src: String, reason: String },
 }
 
 impl SikilError {
@@ -80,10 +100,13 @@ impl SikilError {
             | SikilError::ValidationError { .. }
             | SikilError::SymlinkNotAllowed { .. }
             | SikilError::PathTraversal { .. }
-            | SikilError::InvalidGitUrl { .. } => 2,
+            | SikilError::InvalidGitUrl { .. }
+            | SikilError::ManifestParseError { .. }
+            | SikilError::LockfileMismatch { .. }
+            | SikilError::OutsideProject => 2,
 
-            // Skill not found (exit code 3)
-            SikilError::SkillNotFound { .. } => 3,
+            // Not found errors (exit code 3)
+            SikilError::SkillNotFound { .. } | SikilError::ManifestNotFound { .. } => 3,
 
             // Permission denied (exit code 4)
             SikilError::PermissionDenied { .. } => 4,
@@ -91,9 +114,35 @@ impl SikilError {
             // Network error (exit code 5)
             SikilError::GitError { .. } => 5,
 
+            // SourceUnreachable: code 5 (network) for git sources, code 3 for local paths
+            SikilError::SourceUnreachable { src, .. } => {
+                if Self::is_git_source(src) {
+                    5
+                } else {
+                    3
+                }
+            }
+
             // Default error (exit code 1)
             _ => 1,
         }
+    }
+
+    /// Returns true if the source string looks like a git URL (HTTPS or short-form owner/repo).
+    fn is_git_source(source: &str) -> bool {
+        if source.to_lowercase().starts_with("https://") {
+            return true;
+        }
+        if source.contains('/') {
+            if source.starts_with('/') || source.starts_with('.') || source.starts_with('-') {
+                return false;
+            }
+            let parts: Vec<&str> = source.split('/').collect();
+            if parts.len() >= 2 {
+                return !parts.iter().any(|p| p.is_empty() || p.contains('.'));
+            }
+        }
+        false
     }
 }
 
@@ -340,5 +389,126 @@ mod tests {
             resource: "skill".to_string(),
         };
         assert_eq!(err.exit_code(), 1);
+    }
+
+    // --- v0.2 new variant tests ---
+
+    #[test]
+    fn test_error_display_manifest_not_found() {
+        let err = SikilError::ManifestNotFound {
+            path: PathBuf::from("/project/.sikil/manifest.toml"),
+        };
+        assert_eq!(
+            err.to_string(),
+            "Manifest not found at /project/.sikil/manifest.toml"
+        );
+    }
+
+    #[test]
+    fn test_error_display_manifest_parse_error() {
+        let err = SikilError::ManifestParseError {
+            path: PathBuf::from("/project/.sikil/manifest.toml"),
+            reason: "missing required field 'name'".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "Invalid manifest at /project/.sikil/manifest.toml: missing required field 'name'"
+        );
+    }
+
+    #[test]
+    fn test_error_display_lockfile_mismatch() {
+        let err = SikilError::LockfileMismatch {
+            reason: "content hash differs".to_string(),
+        };
+        assert_eq!(err.to_string(), "Lockfile mismatch: content hash differs");
+    }
+
+    #[test]
+    fn test_error_display_outside_project() {
+        let err = SikilError::OutsideProject;
+        assert_eq!(
+            err.to_string(),
+            "No project found; run `sikil init` or use --global"
+        );
+    }
+
+    #[test]
+    fn test_error_display_source_unreachable() {
+        let err = SikilError::SourceUnreachable {
+            src: "https://github.com/owner/repo".to_string(),
+            reason: "connection timed out".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "Source unreachable: https://github.com/owner/repo - connection timed out"
+        );
+    }
+
+    #[test]
+    fn test_exit_code_manifest_not_found() {
+        let err = SikilError::ManifestNotFound {
+            path: PathBuf::from("/project/.sikil/manifest.toml"),
+        };
+        assert_eq!(err.exit_code(), 3);
+    }
+
+    #[test]
+    fn test_exit_code_manifest_parse_error() {
+        let err = SikilError::ManifestParseError {
+            path: PathBuf::from("/project/.sikil/manifest.toml"),
+            reason: "bad".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_lockfile_mismatch() {
+        let err = SikilError::LockfileMismatch {
+            reason: "hash differs".to_string(),
+        };
+        assert_eq!(err.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_outside_project() {
+        let err = SikilError::OutsideProject;
+        assert_eq!(err.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_source_unreachable_git_url() {
+        let err = SikilError::SourceUnreachable {
+            src: "https://github.com/owner/repo".to_string(),
+            reason: "connection timed out".to_string(),
+        };
+        assert_eq!(err.exit_code(), 5);
+    }
+
+    #[test]
+    fn test_exit_code_source_unreachable_short_form_git() {
+        let err = SikilError::SourceUnreachable {
+            src: "owner/repo".to_string(),
+            reason: "clone failed".to_string(),
+        };
+        assert_eq!(err.exit_code(), 5);
+    }
+
+    #[test]
+    fn test_exit_code_source_unreachable_local_path() {
+        let err = SikilError::SourceUnreachable {
+            src: "/local/skill/path".to_string(),
+            reason: "directory not found".to_string(),
+        };
+        assert_eq!(err.exit_code(), 3);
+    }
+
+    #[test]
+    fn test_exit_code_source_unreachable_relative_path() {
+        let err = SikilError::SourceUnreachable {
+            src: "./skills/my-skill".to_string(),
+            reason: "not found".to_string(),
+        };
+        assert_eq!(err.exit_code(), 3);
     }
 }

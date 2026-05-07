@@ -23,7 +23,7 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Add v0.2 error variants and exit-code mapping
 - **Spec:** error-handling.md
 - **Gap:** `SikilError` lacks `ManifestNotFound`, `ManifestParseError`, `LockfileMismatch`, `OutsideProject`, and `SourceUnreachable`. Exit-code mapping for these variants does not exist.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `SikilError::ManifestNotFound` displays `"Manifest not found at {path}"`
   - `SikilError::ManifestParseError` displays `"Invalid manifest at {path}: {reason}"`
@@ -35,9 +35,9 @@ None - all specs reviewed have complete Acceptance Criteria.
   - `SikilError::LockfileMismatch` exits with code 2 (validation)
   - `SikilError::OutsideProject` exits with code 2 (validation)
   - `SikilError::SourceUnreachable` exits with code 5 (network) for git sources, code 3 for missing local paths
-- **Tests:**
+- **Tests:** src/core/errors.rs — `test_error_display_manifest_not_found`, `test_error_display_manifest_parse_error`, `test_error_display_lockfile_mismatch`, `test_error_display_outside_project`, `test_error_display_source_unreachable`, `test_exit_code_manifest_not_found`, `test_exit_code_manifest_parse_error`, `test_exit_code_lockfile_mismatch`, `test_exit_code_outside_project`, `test_exit_code_source_unreachable_git_url`, `test_exit_code_source_unreachable_short_form_git`, `test_exit_code_source_unreachable_local_path`, `test_exit_code_source_unreachable_relative_path`
 - **Location:** src/core/errors.rs, src/main.rs
-- **Notes:**
+- **Notes:** The `SourceUnreachable` struct field is named `src` (not `source`) to avoid thiserror's automatic `#[source]` detection on fields named `source`. The display output matches the spec exactly. No main.rs changes needed — the existing `get_exit_code()` already delegates to `SikilError::exit_code()`.
 
 ### Add project-root discovery utilities
 - **Spec:** filesystem-paths.md
