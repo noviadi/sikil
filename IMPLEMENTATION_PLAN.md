@@ -59,7 +59,7 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Add atomic_write_file utility
 - **Spec:** atomic-operations.md
 - **Gap:** `atomic_write_file` is required by manifest, lockfile, and sidecar writes but is not present in `src/utils/atomic.rs`.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - `atomic_write_file` writes to a sibling temp file in the destination's parent directory
   - `atomic_write_file` calls `sync_all()` on the temp file before renaming
@@ -67,9 +67,9 @@ None - all specs reviewed have complete Acceptance Criteria.
   - `atomic_write_file` removes the temp file on any failure (no orphaned `.tmp.*` files)
   - `atomic_write_file` creates the parent directory if it does not exist
   - `atomic_write_file` returns `SikilError::PermissionDenied` when the destination directory is not writable
-- **Tests:**
+- **Tests:** src/utils/atomic.rs — `test_atomic_write_file_basic`, `test_atomic_write_file_no_orphaned_temp_files`, `test_atomic_write_file_creates_parent_directory`, `test_atomic_write_file_overwrites_existing`, `test_atomic_write_file_permission_denied`, `test_atomic_write_file_removes_temp_on_failure`, `test_atomic_write_file_preserves_destination_on_failure`
 - **Location:** src/utils/atomic.rs
-- **Notes:**
+- **Notes:** Uses `tempfile::Builder` with `<name>.tmp.<random>` naming pattern. `NamedTempFile` Drop handles temp cleanup on all failure paths (write, sync, persist). The `persist()` method performs the atomic rename; its `PersistError` holds the `NamedTempFile` which cleans up on drop if rename fails.
 
 ### Recognize project store in is_managed_symlink and create_symlink
 - **Spec:** symlink-operations.md

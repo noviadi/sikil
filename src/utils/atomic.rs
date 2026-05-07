@@ -5,6 +5,7 @@
 //! against partial failures.
 
 use fs_err as fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -306,6 +307,64 @@ pub fn safe_remove_dir(path: &Path, confirmed: bool) -> Result<(), SikilError> {
     Ok(())
 }
 
+/// Writes `contents` to `path` atomically using a sibling temp file.
+///
+/// The file is written to `<path>.tmp.<random>` in the parent directory,
+/// fsynced, then renamed over `path`. On any failure, the temp file is
+/// removed and the destination is left unchanged.
+pub fn atomic_write_file(path: &Path, contents: &[u8]) -> Result<(), SikilError> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+
+    // Create parent directory if it doesn't exist
+    if !parent.as_os_str().is_empty() {
+        fs::create_dir_all(parent).map_err(|_| SikilError::PermissionDenied {
+            operation: "write".to_string(),
+            path: parent.to_path_buf(),
+        })?;
+    }
+
+    // Create temp file in parent directory: <name>.tmp.<random>
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let prefix = format!("{file_name}.tmp.");
+
+    let mut temp = tempfile::Builder::new()
+        .prefix(&prefix)
+        .rand_bytes(8)
+        .tempfile_in(parent)
+        .map_err(|_| SikilError::PermissionDenied {
+            operation: "write".to_string(),
+            path: parent.to_path_buf(),
+        })?;
+
+    // Write contents — NamedTempFile Drop cleans up on early return
+    temp.write_all(contents)
+        .map_err(|_| SikilError::PermissionDenied {
+            operation: "write".to_string(),
+            path: path.to_path_buf(),
+        })?;
+
+    // Fsync before rename
+    temp.as_file()
+        .sync_all()
+        .map_err(|_| SikilError::PermissionDenied {
+            operation: "sync".to_string(),
+            path: path.to_path_buf(),
+        })?;
+
+    // Atomic rename; persist consumes temp, PersistError drop cleans up on failure
+    if let Err(_e) = temp.persist(path) {
+        return Err(SikilError::PermissionDenied {
+            operation: "rename".to_string(),
+            path: path.to_path_buf(),
+        });
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -552,5 +611,155 @@ mod tests {
         let result = copy_skill_dir(src_path, &dest_path);
         assert!(result.is_ok());
         assert!(dest_path.join("empty").exists());
+    }
+
+    // --- atomic_write_file tests ---
+
+    #[test]
+    fn test_atomic_write_file_basic() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        atomic_write_file(&path, b"hello world").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_atomic_write_file_no_orphaned_temp_files() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        atomic_write_file(&path, b"hello").unwrap();
+
+        for entry in fs::read_dir(dir.path()).unwrap() {
+            let name = entry.unwrap().file_name();
+            let name_str = name.to_string_lossy();
+            assert!(
+                !name_str.contains(".tmp."),
+                "Found orphaned temp file: {}",
+                name_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_atomic_write_file_creates_parent_directory() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("nested/deep/output.txt");
+
+        atomic_write_file(&path, b"created parents").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "created parents");
+    }
+
+    #[test]
+    fn test_atomic_write_file_overwrites_existing() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        atomic_write_file(&path, b"original").unwrap();
+        atomic_write_file(&path, b"updated").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "updated");
+    }
+
+    #[test]
+    fn test_atomic_write_file_permission_denied() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        // Make parent read-only
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o444);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        let result = atomic_write_file(&path, b"should fail");
+
+        // Restore for cleanup
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        assert!(result.is_err());
+        match result {
+            Err(SikilError::PermissionDenied { .. }) => {}
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_atomic_write_file_removes_temp_on_failure() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o444);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        let _ = atomic_write_file(&path, b"should fail");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        for entry in fs::read_dir(dir.path()).unwrap() {
+            let name = entry.unwrap().file_name();
+            let name_str = name.to_string_lossy();
+            assert!(
+                !name_str.contains(".tmp."),
+                "Found orphaned temp file: {}",
+                name_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_atomic_write_file_preserves_destination_on_failure() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("output.txt");
+
+        // Pre-create destination
+        fs::write(&path, b"original").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o444);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        let _ = atomic_write_file(&path, b"should not overwrite");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(dir.path()).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(dir.path(), perms).unwrap();
+        }
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "original");
     }
 }
