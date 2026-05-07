@@ -172,14 +172,14 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Recognize project-managed installations in conflict detection
 - **Spec:** conflict-detection.md
 - **Gap:** `detect_conflicts` only treats `~/.sikil/repo/` as managed; project-managed installations from `<project_root>/.sikil/skills/` are not recognized as a separate scope.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - Installation is classified as managed only when `is_symlink == Some(true)` AND `symlink_target` starts with the global repo path or the project-managed store path
   - Two managed installs are considered duplicates when their resolved `repo_path` is identical
   - A managed installation in `<project>/.sikil/skills/` and a managed installation in `~/.sikil/repo/` for the same skill name are not considered a conflict (they belong to different scopes)
-- **Tests:**
-- **Location:** src/core/conflicts.rs
-- **Notes:**
+- **Tests:** src/core/conflicts.rs — `test_managed_when_symlink_under_global_repo`, `test_managed_when_symlink_under_project_skills`, `test_not_managed_when_symlink_outside_stores`, `test_cross_scope_no_conflict`, `test_cross_scope_duplicate_managed_within_each_scope`, `test_duplicate_managed_same_repo_path_within_project`
+- **Location:** src/core/conflicts.rs, src/commands/list.rs
+- **Notes:** `detect_conflicts` signature changed to accept `repo_path: &Path` and `project_skills_path: Option<&Path>`. Managed status is now determined by checking `symlink_target.starts_with()` against the global repo root and/or project skills root. Managed installations are grouped by their symlink target (repo_path); only installations sharing the same repo_path trigger DuplicateManaged. Cross-scope installations (global vs project) naturally do not conflict because their symlink targets resolve to different paths. Caller in `list.rs` updated to discover project root and pass both store paths.
 
 ---
 

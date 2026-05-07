@@ -6,7 +6,8 @@
 use crate::core::scanner::ScanResult;
 use crate::core::skill::Installation;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 /// Type of conflict detected between skill installations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,66 +156,54 @@ impl ConflictLocation {
 /// - **DuplicateUnmanaged**: Multiple unmanaged installations with the same skill name
 /// - **DuplicateManaged**: Multiple managed installations (symlinks to same repo)
 ///
+/// An installation is classified as managed when `is_symlink == Some(true)` AND
+/// the symlink target starts with the global repo path or the project-managed
+/// store path.
+///
+/// Managed installations from different scopes (global vs project) do not
+/// conflict with each other.
+///
 /// # Arguments
 ///
 /// * `scan_result` - The scan result to analyze for conflicts
+/// * `repo_path` - The global repo root path (e.g., `~/.sikil/repo/`)
+/// * `project_skills_path` - Optional project skills root path
+///   (e.g., `<project_root>/.sikil/skills/`)
 ///
 /// # Returns
 ///
 /// A vector of conflicts detected. Returns empty vector if no conflicts found.
-///
-/// # Examples
-///
-/// ```no_run
-/// use sikil::core::conflicts::detect_conflicts;
-/// use sikil::core::scanner::ScanResult;
-///
-/// let scan_result = ScanResult::new();
-/// let conflicts = detect_conflicts(&scan_result);
-///
-/// for conflict in conflicts {
-///     println!("Conflict: {}", conflict.summary());
-///     for rec in conflict.recommendations() {
-///         println!("  - {}", rec);
-///     }
-/// }
-/// ```
-pub fn detect_conflicts(scan_result: &ScanResult) -> Vec<Conflict> {
+pub fn detect_conflicts(
+    scan_result: &ScanResult,
+    repo_path: &Path,
+    project_skills_path: Option<&Path>,
+) -> Vec<Conflict> {
     let mut conflicts = Vec::new();
 
     for (skill_name, skill) in &scan_result.skills {
-        // Group installations by management type and paths
         let mut unmanaged_locations: Vec<ConflictLocation> = Vec::new();
-        let mut managed_locations: Vec<ConflictLocation> = Vec::new();
-        let mut managed_repo_paths: Vec<PathBuf> = Vec::new();
+        let mut managed_groups: HashMap<PathBuf, Vec<ConflictLocation>> = HashMap::new();
 
         for installation in &skill.installations {
+            let symlink_target = installation.symlink_target.as_ref();
             let is_managed = installation.is_symlink == Some(true)
-                && installation
-                    .symlink_target
-                    .as_ref()
+                && symlink_target
                     .map(|t| {
-                        // Check if symlink target is under repo path
-                        skill
-                            .repo_path
-                            .as_ref()
-                            .map(|repo| t.starts_with(repo) || t == repo)
-                            .unwrap_or(false)
+                        t.starts_with(repo_path)
+                            || project_skills_path.is_some_and(|psp| t.starts_with(psp))
                     })
                     .unwrap_or(false);
 
             if is_managed {
-                let repo_path = skill.repo_path.clone();
-                managed_locations.push(ConflictLocation::from_installation(
-                    installation,
-                    true,
-                    repo_path,
-                ));
-                if let Some(ref repo) = skill.repo_path {
-                    if !managed_repo_paths.contains(repo) {
-                        managed_repo_paths.push(repo.clone());
-                    }
-                }
+                let inst_repo_path = symlink_target.unwrap().clone();
+                managed_groups
+                    .entry(inst_repo_path.clone())
+                    .or_default()
+                    .push(ConflictLocation::from_installation(
+                        installation,
+                        true,
+                        Some(inst_repo_path),
+                    ));
             } else {
                 unmanaged_locations.push(ConflictLocation::from_installation(
                     installation,
@@ -225,15 +214,9 @@ pub fn detect_conflicts(scan_result: &ScanResult) -> Vec<Conflict> {
         }
 
         // Check for duplicate unmanaged conflicts
-        // A conflict exists if there are multiple unmanaged locations with different paths
         if unmanaged_locations.len() > 1 {
-            // Check if the paths are actually different
-            let unique_paths: Vec<&PathBuf> = unmanaged_locations
-                .iter()
-                .map(|loc| &loc.path)
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect();
+            let unique_paths: std::collections::HashSet<&PathBuf> =
+                unmanaged_locations.iter().map(|loc| &loc.path).collect();
 
             if unique_paths.len() > 1 {
                 conflicts.push(Conflict::new(
@@ -244,17 +227,12 @@ pub fn detect_conflicts(scan_result: &ScanResult) -> Vec<Conflict> {
             }
         }
 
-        // Check for duplicate managed conflicts
-        // Multiple managed installations pointing to the same repo is informational
-        if managed_locations.len() > 1 && !managed_repo_paths.is_empty() {
-            // This is actually OK - all symlinks to the same managed skill
-            // Only report as conflict (informational) if there are multiple unique repo paths
-            // or if there are multiple symlinks to the same repo (normal but worth noting)
-            if managed_repo_paths.len() == 1 {
-                // All point to same repo - this is normal but we track it
+        // Check for duplicate managed conflicts within each repo_path group
+        for locations in managed_groups.into_values() {
+            if locations.len() > 1 {
                 conflicts.push(Conflict::new(
                     skill_name.clone(),
-                    managed_locations,
+                    locations,
                     ConflictType::DuplicateManaged,
                 ));
             }
@@ -508,25 +486,24 @@ mod tests {
     #[test]
     fn test_detect_conflicts_no_conflicts() {
         let mut scan_result = ScanResult::new();
+        let repo_path = PathBuf::from("/home/user/.sikil/repo");
 
-        // Add a single skill with one installation
         let metadata = SkillMetadata::new("test-skill".to_string(), "A test".to_string());
         let skill = Skill::new(metadata, "test-skill".to_string());
         scan_result.skills.insert("test-skill".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
+        let conflicts = detect_conflicts(&scan_result, &repo_path, None);
         assert_eq!(conflicts.len(), 0);
     }
 
     #[test]
     fn test_detect_conflicts_duplicate_unmanaged() {
         let mut scan_result = ScanResult::new();
+        let repo_path = PathBuf::from("/home/user/.sikil/repo");
 
-        // Create a skill with multiple unmanaged installations at different paths
         let metadata = SkillMetadata::new("dupe-skill".to_string(), "Duplicate".to_string());
         let mut skill = Skill::new(metadata, "dupe-skill".to_string());
 
-        // Add two unmanaged installations at different paths
         skill.installations.push(
             Installation::new(
                 Agent::ClaudeCode,
@@ -547,7 +524,7 @@ mod tests {
 
         scan_result.skills.insert("dupe-skill".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
+        let conflicts = detect_conflicts(&scan_result, &repo_path, None);
         assert_eq!(conflicts.len(), 1);
         assert_eq!(conflicts[0].skill_name, "dupe-skill");
         assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateUnmanaged);
@@ -557,18 +534,17 @@ mod tests {
     #[test]
     fn test_detect_conflicts_duplicate_managed() {
         let temp_dir = TempDir::new().unwrap();
-        let repo_path = temp_dir.path().join("repo").join("managed-skill");
-        fs::create_dir_all(&repo_path).unwrap();
+        let repo_root = temp_dir.path().join("repo");
+        let skill_repo = repo_root.join("managed-skill");
+        fs::create_dir_all(&skill_repo).unwrap();
 
         let mut scan_result = ScanResult::new();
 
-        // Create a skill with multiple managed installations (symlinks to same repo)
         let metadata = SkillMetadata::new("managed-skill".to_string(), "Managed".to_string());
-        let mut skill = Skill::new(metadata.clone(), "managed-skill".to_string());
+        let mut skill = Skill::new(metadata, "managed-skill".to_string());
         skill.is_managed = true;
-        skill.repo_path = Some(repo_path.clone());
+        skill.repo_path = Some(skill_repo.clone());
 
-        // Add multiple managed installations (symlinks)
         skill.installations.push(
             Installation::new(
                 Agent::ClaudeCode,
@@ -576,7 +552,7 @@ mod tests {
                 Scope::Global,
             )
             .with_is_symlink(true)
-            .with_symlink_target(repo_path.clone()),
+            .with_symlink_target(skill_repo.clone()),
         );
 
         skill.installations.push(
@@ -586,27 +562,25 @@ mod tests {
                 Scope::Global,
             )
             .with_is_symlink(true)
-            .with_symlink_target(repo_path.clone()),
+            .with_symlink_target(skill_repo.clone()),
         );
 
         scan_result
             .skills
             .insert("managed-skill".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
+        let conflicts = detect_conflicts(&scan_result, &repo_root, None);
         assert_eq!(conflicts.len(), 1);
         assert_eq!(conflicts[0].skill_name, "managed-skill");
         assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateManaged);
-        // DuplicateManaged is not an error
         assert!(!conflicts[0].conflict_type.is_error());
     }
 
     #[test]
     fn test_detect_conflicts_same_path_not_duplicate() {
         let mut scan_result = ScanResult::new();
+        let repo_path = PathBuf::from("/home/user/.sikil/repo");
 
-        // Create a skill with two installations at the same path
-        // This shouldn't be flagged as a conflict (same physical location)
         let metadata = SkillMetadata::new("same-path".to_string(), "Same path".to_string());
         let mut skill = Skill::new(metadata, "same-path".to_string());
 
@@ -622,26 +596,24 @@ mod tests {
 
         scan_result.skills.insert("same-path".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
-        // No conflict because it's the same path
+        let conflicts = detect_conflicts(&scan_result, &repo_path, None);
         assert_eq!(conflicts.len(), 0);
     }
 
     #[test]
     fn test_detect_conflicts_mixed_managed_unmanaged() {
         let temp_dir = TempDir::new().unwrap();
-        let repo_path = temp_dir.path().join("repo").join("mixed-skill");
-        fs::create_dir_all(&repo_path).unwrap();
+        let repo_root = temp_dir.path().join("repo");
+        let skill_repo = repo_root.join("mixed-skill");
+        fs::create_dir_all(&skill_repo).unwrap();
 
         let mut scan_result = ScanResult::new();
 
-        // Create a skill with both managed and unmanaged installations
         let metadata = SkillMetadata::new("mixed-skill".to_string(), "Mixed".to_string());
-        let mut skill = Skill::new(metadata.clone(), "mixed-skill".to_string());
+        let mut skill = Skill::new(metadata, "mixed-skill".to_string());
         skill.is_managed = true;
-        skill.repo_path = Some(repo_path.clone());
+        skill.repo_path = Some(skill_repo.clone());
 
-        // Add managed installation
         skill.installations.push(
             Installation::new(
                 Agent::ClaudeCode,
@@ -649,10 +621,9 @@ mod tests {
                 Scope::Global,
             )
             .with_is_symlink(true)
-            .with_symlink_target(repo_path.clone()),
+            .with_symlink_target(skill_repo.clone()),
         );
 
-        // Add unmanaged installation at different path
         skill.installations.push(
             Installation::new(
                 Agent::Windsurf,
@@ -664,10 +635,7 @@ mod tests {
 
         scan_result.skills.insert("mixed-skill".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
-        // Only one unmanaged installation, so no DuplicateUnmanaged conflict
-        // Only one managed installation, so no DuplicateManaged conflict
-        // A single managed + single unmanaged is not a "duplicate" scenario
+        let conflicts = detect_conflicts(&scan_result, &repo_root, None);
         assert_eq!(conflicts.len(), 0);
     }
 
@@ -705,13 +673,15 @@ mod tests {
     #[test]
     fn test_detect_conflicts_empty_result() {
         let scan_result = ScanResult::new();
-        let conflicts = detect_conflicts(&scan_result);
+        let repo_path = PathBuf::from("/home/user/.sikil/repo");
+        let conflicts = detect_conflicts(&scan_result, &repo_path, None);
         assert_eq!(conflicts.len(), 0);
     }
 
     #[test]
     fn test_detect_conflicts_multiple_skills() {
         let mut scan_result = ScanResult::new();
+        let repo_path = PathBuf::from("/home/user/.sikil/repo");
 
         // Add first skill with conflict
         let metadata1 = SkillMetadata::new("conflict-1".to_string(), "Conflict 1".to_string());
@@ -760,7 +730,7 @@ mod tests {
         );
         scan_result.skills.insert("conflict-2".to_string(), skill3);
 
-        let conflicts = detect_conflicts(&scan_result);
+        let conflicts = detect_conflicts(&scan_result, &repo_path, None);
         assert_eq!(conflicts.len(), 2);
 
         let conflict_names: Vec<_> = conflicts.iter().map(|c| &c.skill_name).collect();
@@ -797,16 +767,16 @@ mod tests {
     #[test]
     fn test_detect_conflicts_with_symlink_target_resolution() {
         let temp_dir = TempDir::new().unwrap();
-        let repo_path = temp_dir.path().join("repo").join("symlink-skill");
-        fs::create_dir_all(&repo_path).unwrap();
+        let repo_root = temp_dir.path().join("repo");
+        let skill_repo = repo_root.join("symlink-skill");
+        fs::create_dir_all(&skill_repo).unwrap();
 
         let mut scan_result = ScanResult::new();
 
-        // Create a skill with symlink pointing to repo (managed)
         let metadata = SkillMetadata::new("symlink-skill".to_string(), "Symlink".to_string());
-        let mut skill = Skill::new(metadata.clone(), "symlink-skill".to_string());
+        let mut skill = Skill::new(metadata, "symlink-skill".to_string());
         skill.is_managed = true;
-        skill.repo_path = Some(repo_path.clone());
+        skill.repo_path = Some(skill_repo.clone());
 
         skill.installations.push(
             Installation::new(
@@ -815,15 +785,14 @@ mod tests {
                 Scope::Global,
             )
             .with_is_symlink(true)
-            .with_symlink_target(repo_path.clone()),
+            .with_symlink_target(skill_repo.clone()),
         );
 
         scan_result
             .skills
             .insert("symlink-skill".to_string(), skill);
 
-        let conflicts = detect_conflicts(&scan_result);
-        // Single managed installation should not create a conflict
+        let conflicts = detect_conflicts(&scan_result, &repo_root, None);
         assert_eq!(conflicts.len(), 0);
     }
 
@@ -1187,5 +1156,298 @@ mod tests {
         )];
         let summary = format_conflicts_summary(&conflicts, true);
         assert_eq!(summary, "1 info");
+    }
+
+    // --- Project-aware conflict detection tests ---
+
+    /// AC1: Managed when symlink target is under global repo path
+    #[test]
+    fn test_managed_when_symlink_under_global_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("repo");
+        let skill_repo = repo_root.join("my-skill");
+        fs::create_dir_all(&skill_repo).unwrap();
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("my-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "my-skill".to_string());
+        skill.is_managed = true;
+        skill.repo_path = Some(skill_repo.clone());
+
+        // Symlink to global repo -> managed
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                PathBuf::from("/claude/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(skill_repo.clone()),
+        );
+
+        // Another symlink to same global repo -> DuplicateManaged
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                PathBuf::from("/windsurf/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(skill_repo.clone()),
+        );
+
+        scan_result.skills.insert("my-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, None);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateManaged);
+        assert!(conflicts[0].locations.iter().all(|l| l.is_managed));
+    }
+
+    /// AC1: Managed when symlink target is under project skills path
+    #[test]
+    fn test_managed_when_symlink_under_project_skills() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("global-repo");
+        let project_root = temp_dir.path().join("project");
+        let project_skills = project_root.join(".sikil").join("skills");
+        let skill_repo = project_skills.join("my-skill");
+        fs::create_dir_all(&skill_repo).unwrap();
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("my-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "my-skill".to_string());
+        skill.is_managed = true;
+        skill.repo_path = Some(skill_repo.clone());
+
+        // Symlink to project skills -> managed
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                project_root.join(".claude/skills/my-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(skill_repo.clone()),
+        );
+
+        // Another symlink to same project skill -> DuplicateManaged
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                project_root.join(".windsurf/skills/my-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(skill_repo.clone()),
+        );
+
+        scan_result.skills.insert("my-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, Some(&project_skills));
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateManaged);
+    }
+
+    /// AC1: Not managed when symlink target is outside both stores
+    #[test]
+    fn test_not_managed_when_symlink_outside_stores() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("global-repo");
+        let project_skills = temp_dir.path().join("project/.sikil/skills");
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("my-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "my-skill".to_string());
+
+        // Symlink to location outside both stores -> not managed
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                PathBuf::from("/claude/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(PathBuf::from("/random/place/my-skill")),
+        );
+
+        // Another symlink to a different outside location
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                PathBuf::from("/windsurf/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(PathBuf::from("/other/random/place/my-skill")),
+        );
+
+        scan_result.skills.insert("my-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, Some(&project_skills));
+        // Both are classified as unmanaged since targets are outside stores
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateUnmanaged);
+    }
+
+    /// AC3: Cross-scope (global + project) installations do NOT conflict
+    #[test]
+    fn test_cross_scope_no_conflict() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("global-repo");
+        let global_skill = repo_root.join("my-skill");
+        fs::create_dir_all(&global_skill).unwrap();
+
+        let project_skills = temp_dir.path().join("project/.sikil/skills");
+        let project_skill = project_skills.join("my-skill");
+        fs::create_dir_all(&project_skill).unwrap();
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("my-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "my-skill".to_string());
+        skill.is_managed = true;
+        skill.repo_path = Some(global_skill.clone());
+
+        // Global managed installation
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                PathBuf::from("/claude/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(global_skill.clone()),
+        );
+
+        // Project managed installation (different scope)
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                PathBuf::from("/project/.windsurf/skills/my-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(project_skill.clone()),
+        );
+
+        scan_result.skills.insert("my-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, Some(&project_skills));
+        // Cross-scope should NOT conflict
+        assert_eq!(conflicts.len(), 0);
+    }
+
+    /// AC3: Multiple global + multiple project managed -> DuplicateManaged within each scope only
+    #[test]
+    fn test_cross_scope_duplicate_managed_within_each_scope() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("global-repo");
+        let global_skill = repo_root.join("my-skill");
+        fs::create_dir_all(&global_skill).unwrap();
+
+        let project_skills = temp_dir.path().join("project/.sikil/skills");
+        let project_skill = project_skills.join("my-skill");
+        fs::create_dir_all(&project_skill).unwrap();
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("my-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "my-skill".to_string());
+        skill.is_managed = true;
+        skill.repo_path = Some(global_skill.clone());
+
+        // Two global managed installations
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                PathBuf::from("/claude/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(global_skill.clone()),
+        );
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                PathBuf::from("/windsurf/skills/my-skill"),
+                Scope::Global,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(global_skill.clone()),
+        );
+
+        // Two project managed installations
+        skill.installations.push(
+            Installation::new(
+                Agent::OpenCode,
+                PathBuf::from("/project/.opencode/skill/my-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(project_skill.clone()),
+        );
+        skill.installations.push(
+            Installation::new(
+                Agent::KiloCode,
+                PathBuf::from("/project/.kilocode/skills/my-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(project_skill.clone()),
+        );
+
+        scan_result.skills.insert("my-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, Some(&project_skills));
+        // Should have 2 DuplicateManaged: one for global, one for project
+        assert_eq!(conflicts.len(), 2);
+        assert!(conflicts
+            .iter()
+            .all(|c| c.conflict_type == ConflictType::DuplicateManaged));
+
+        // Each conflict should have exactly 2 locations
+        assert!(conflicts.iter().all(|c| c.locations.len() == 2));
+    }
+
+    /// AC2: Two managed installs with same repo_path are considered duplicates
+    #[test]
+    fn test_duplicate_managed_same_repo_path_within_project() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path().join("global-repo");
+        let project_skills = temp_dir.path().join("project/.sikil/skills");
+        let project_skill = project_skills.join("shared-skill");
+        fs::create_dir_all(&project_skill).unwrap();
+
+        let mut scan_result = ScanResult::new();
+        let metadata = SkillMetadata::new("shared-skill".to_string(), "Test".to_string());
+        let mut skill = Skill::new(metadata, "shared-skill".to_string());
+        skill.is_managed = true;
+        skill.repo_path = Some(project_skill.clone());
+
+        // Two project-managed symlinks to same repo_path
+        skill.installations.push(
+            Installation::new(
+                Agent::ClaudeCode,
+                PathBuf::from("/project/.claude/skills/shared-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(project_skill.clone()),
+        );
+        skill.installations.push(
+            Installation::new(
+                Agent::Windsurf,
+                PathBuf::from("/project/.windsurf/skills/shared-skill"),
+                Scope::Workspace,
+            )
+            .with_is_symlink(true)
+            .with_symlink_target(project_skill.clone()),
+        );
+
+        scan_result.skills.insert("shared-skill".to_string(), skill);
+
+        let conflicts = detect_conflicts(&scan_result, &repo_root, Some(&project_skills));
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].conflict_type, ConflictType::DuplicateManaged);
+        assert_eq!(conflicts[0].locations.len(), 2);
     }
 }

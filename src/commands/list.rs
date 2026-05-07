@@ -8,6 +8,7 @@ use crate::core::config::Config;
 use crate::core::conflicts;
 use crate::core::scanner::Scanner;
 use crate::core::skill::{Agent, Scope, Skill};
+use crate::utils::paths::{get_project_skills_path, get_repo_path};
 use anyhow::Result;
 
 /// Arguments for the list command
@@ -127,7 +128,11 @@ pub fn execute_list(args: ListArgs, config: &Config) -> Result<()> {
     let scan_result = scanner.scan_all_agents();
 
     // Detect conflicts
-    let all_conflicts = conflicts::detect_conflicts(&scan_result);
+    let repo_path = get_repo_path();
+    let project_skills_path =
+        crate::utils::paths::get_project_root().map(|root| get_project_skills_path(&root));
+    let all_conflicts =
+        conflicts::detect_conflicts(&scan_result, &repo_path, project_skills_path.as_deref());
 
     // Get all skills
     let skills = scan_result.all_skills();
