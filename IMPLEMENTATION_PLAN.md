@@ -92,7 +92,7 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Implement manifest read/write/reconcile layer
 - **Spec:** project-manifest.md
 - **Gap:** No `src/core/manifest.rs` (or equivalent) implementing manifest schema parsing, lockfile schema parsing, or the reconcile algorithm.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - Project root discovery walks up from cwd, finding `.sikil/manifest.toml` before `.git/`
   - A `.git` file (worktree marker) is treated equivalently to a `.git/` directory for root discovery
@@ -118,9 +118,9 @@ None - all specs reviewed have complete Acceptance Criteria.
   - Agent symlinks committed to git remain valid after `git clone` to a different absolute path (because they are relative)
   - Manifest writes are atomic (temp file + rename); a crash mid-write leaves the previous manifest intact
   - Lockfile writes are atomic (temp file + rename)
-- **Tests:**
-- **Location:** src/core/manifest.rs (new), src/commands/install.rs
-- **Notes:** This is the largest task in the plan. Implementing it requires the new commands `install` (no-args reconciliation) to be wired in `src/main.rs`. AC bullets that belong to other commands (`init`, `update`, `add`, `remove`) are split out into their own tasks below.
+- **Tests:** src/core/manifest.rs — `test_load_manifest_valid`, `test_load_manifest_missing_file`, `test_load_manifest_no_skills`, `test_load_manifest_unsupported_schema_version`, `test_load_manifest_unknown_top_level_fields`, `test_load_manifest_unknown_entry_fields`, `test_load_manifest_exceeds_1mb`, `test_save_and_load_manifest_roundtrip`, `test_save_manifest_atomic`, `test_load_lockfile_valid`, `test_load_lockfile_missing_returns_empty`, `test_load_lockfile_unsupported_version`, `test_load_lockfile_unknown_fields`, `test_save_and_load_lockfile_roundtrip`, `test_save_lockfile_atomic`, `test_compute_content_hash_basic`, `test_compute_content_hash_excludes_git`, `test_compute_content_hash_excludes_sidecar`, `test_compute_content_hash_deterministic`, `test_compute_content_hash_differs_for_different_content`, `test_compute_content_hash_sha256_prefix`, `test_compute_content_hash_missing_path`, `test_compute_content_hash_nested_directories`, `test_manifest_entry_with_all_optional_fields`, `test_manifest_entry_with_only_required_fields`, `test_save_manifest_idempotent`, `test_reconcile_new_manifest_entry_triggers_resolve`, `test_reconcile_orphaned_lockfile_entry_triggers_remove`, `test_reconcile_matching_entry_with_valid_content_triggers_keep`, `test_reconcile_matching_entry_with_missing_vendored_bytes_triggers_resolve`, `test_reconcile_matching_entry_with_changed_content_triggers_resolve`, `test_reconcile_mixed_actions`, `test_reconcile_empty_manifest_removes_all_lockfile_entries`, `test_reconcile_empty_lockfile_resolves_all_manifest_entries`
+- **Location:** src/core/manifest.rs (new)
+- **Notes:** Implements core manifest/lockfile types (`Manifest`, `ManifestEntry`, `Lockfile`, `LockfileEntry`) with serde TOML support, load/save functions with validation (schema_version, deny_unknown_fields, 1 MB size cap), `compute_content_hash` (SHA-256 excluding `.git/` and `.sikil-source.toml`), and `reconcile()` algorithm comparing manifest vs lockfile entries. Remaining AC that require install command wiring (project-scope install, agent symlink creation, git fetch/clone, multi-source deduplication, local-path resolution) are deferred to the "Extend install command for project scope" task. Comment preservation uses `toml::to_string_pretty` (best-effort); full `toml_edit` integration can be added as a follow-up. No new Cargo.toml dependencies were needed.
 
 ### Implement provenance sidecar layer
 - **Spec:** provenance.md

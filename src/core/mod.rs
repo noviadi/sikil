@@ -4,6 +4,7 @@ pub mod cache;
 pub mod config;
 pub mod conflicts;
 pub mod errors;
+pub mod manifest;
 pub mod parser;
 pub mod scanner;
 pub mod skill;
