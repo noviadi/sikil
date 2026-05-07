@@ -159,15 +159,15 @@ None - all specs reviewed have complete Acceptance Criteria.
 ### Make scanner project-aware
 - **Spec:** skill-scanner.md
 - **Gap:** Scanner does not call `find_project_root`, does not anchor workspace paths at project root, and does not include `<project_root>/.sikil/skills/` in the scan.
-- **Completed:** false
+- **Completed:** true
 - **Acceptance Criteria:**
   - When invoked inside a project root, workspace paths are anchored at the project root rather than cwd
   - When invoked inside a project root, the project-managed store at `<project_root>/.sikil/skills/` is included in the scan
   - Symlinks pointing into `<project_root>/.sikil/skills/` are classified as managed (project-managed)
   - A skill present in both the project-managed store and the global repo appears as a single skill with installations from both scopes
-- **Tests:**
+- **Tests:** src/core/scanner.rs — `test_workspace_paths_anchored_at_project_root`, `test_project_managed_store_included_in_scan`, `test_symlinks_to_project_skills_classified_as_managed`, `test_skill_in_both_project_and_global_merged`
 - **Location:** src/core/scanner.rs
-- **Notes:** depends on filesystem-paths task and symlink-operations task
+- **Notes:** `scan_all_agents` now calls `find_project_root(workspace_root)` and uses the discovered root for workspace path anchoring. New `scan_project_skills` method scans `<project_root>/.sikil/skills/` and marks found skills as managed. Project store scan runs before the global repo scan in the traversal order.
 
 ### Recognize project-managed installations in conflict detection
 - **Spec:** conflict-detection.md

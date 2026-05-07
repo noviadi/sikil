@@ -9,7 +9,7 @@ use crate::core::config::Config;
 use crate::core::errors::SikilError;
 use crate::core::parser::parse_skill_md;
 use crate::core::skill::{Agent, Installation, Scope, Skill, SkillMetadata};
-use crate::utils::paths::get_repo_path;
+use crate::utils::paths::{find_project_root, get_project_skills_path, get_repo_path};
 use crate::utils::symlink::{read_symlink_target, resolve_realpath};
 use fs_err as fs;
 use serde::Serialize;
@@ -688,6 +688,13 @@ impl Scanner {
     pub fn scan_all_agents(&self) -> ScanResult {
         let mut result = ScanResult::new();
 
+        // Discover project root from workspace root
+        let cwd = self.get_workspace_root();
+        let project_root = find_project_root(&cwd);
+
+        // Use project_root for workspace anchoring if found, otherwise cwd
+        let workspace_anchor: &Path = project_root.as_ref().unwrap_or(&cwd);
+
         // Scan global paths for all enabled agents
         for (agent_name, agent_config) in &self.config.agents {
             if !agent_config.enabled {
@@ -709,12 +716,11 @@ impl Scanner {
                     }
                 }
 
-                // Scan workspace path (relative to workspace root)
+                // Scan workspace path (anchored at project root if found)
                 let workspace_path = if agent_config.workspace_path.is_absolute() {
                     agent_config.workspace_path.clone()
                 } else {
-                    // Relative to workspace root (uses env::current_dir() by default)
-                    self.get_workspace_root().join(&agent_config.workspace_path)
+                    workspace_anchor.join(&agent_config.workspace_path)
                 };
 
                 if workspace_path.exists() {
@@ -725,6 +731,11 @@ impl Scanner {
                     }
                 }
             }
+        }
+
+        // Scan project-managed store if inside a project
+        if let Some(ref root) = project_root {
+            self.scan_project_skills(root, &mut result);
         }
 
         // Scan the managed skills repository
@@ -800,6 +811,72 @@ impl Scanner {
                 }
                 Err(e) => {
                     // Record error but continue scanning
+                    result.add_error(skill_md_path, e.to_string());
+                }
+            }
+        }
+    }
+
+    /// Scans the project-managed skills store.
+    ///
+    /// The project store contains skill directories stored under
+    /// `<project_root>/.sikil/skills/`. Each subdirectory is a potential
+    /// project-managed skill.
+    fn scan_project_skills(&self, project_root: &Path, result: &mut ScanResult) {
+        let project_skills_path = get_project_skills_path(project_root);
+
+        if !project_skills_path.exists() {
+            return;
+        }
+
+        let entries = match fs::read_dir(&project_skills_path) {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+
+            if !entry_path.is_dir() {
+                continue;
+            }
+
+            let dir_name = match entry_path.file_name() {
+                Some(name) => name.to_string_lossy().to_string(),
+                None => continue,
+            };
+            if dir_name.starts_with('.') {
+                continue;
+            }
+
+            let skill_md_path = entry_path.join("SKILL.md");
+            match self.parse_skill_entry(&skill_md_path, &entry_path, &dir_name) {
+                Ok(metadata) => {
+                    let skill_entry = SkillEntry::new(
+                        metadata,
+                        dir_name.clone(),
+                        entry_path.clone(),
+                        false,
+                        None,
+                        None,
+                        Scope::Workspace,
+                    );
+
+                    let mut skill = skill_entry.to_skill();
+                    skill.is_managed = true;
+                    skill.repo_path = Some(entry_path);
+
+                    let skill_name = skill.metadata.name.clone();
+                    result.entries_found += 1;
+
+                    if let Some(existing) = result.skills.get_mut(&skill_name) {
+                        existing.is_managed = true;
+                        existing.repo_path = skill.repo_path;
+                    } else {
+                        result.skills.insert(skill_name, skill);
+                    }
+                }
+                Err(e) => {
                     result.add_error(skill_md_path, e.to_string());
                 }
             }
@@ -2200,6 +2277,246 @@ description: Now I'm valid
         // Should now find the skill
         assert_eq!(result2.skill_count(), 1);
         assert!(result2.skills.contains_key("fix-me-skill"));
+    }
+
+    // --- Project-aware scanner tests ---
+
+    #[test]
+    fn test_workspace_paths_anchored_at_project_root() {
+        // AC 1: When invoked inside a project root, workspace paths are
+        // anchored at the project root rather than cwd.
+        let temp_base = TempDir::new().unwrap();
+        let project_root = temp_base.path();
+
+        // Create project marker
+        let sikil_dir = project_root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "schema_version = 1\n").unwrap();
+
+        // Create workspace skill at <project_root>/.claude/skills/
+        let ws_skills = project_root.join(".claude").join("skills");
+        fs::create_dir_all(&ws_skills).unwrap();
+        let skill_dir = ws_skills.join("project-skill");
+        fs::create_dir(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: project-skill
+description: A project workspace skill
+---"#,
+        )
+        .unwrap();
+
+        // Create a nested directory (simulating cwd deep inside project)
+        let nested = project_root.join("src").join("components");
+        fs::create_dir_all(&nested).unwrap();
+
+        // Create empty repo
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                PathBuf::from("/nonexistent/global"),
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+
+        // workspace_root is the nested dir, but project root should anchor at project_root
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(&nested)
+            .with_repo_root(&repo_dir);
+        let result = scanner.scan_all_agents();
+
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("project-skill"));
+        let skill = &result.skills["project-skill"];
+        assert_eq!(skill.installations[0].scope, Scope::Workspace);
+    }
+
+    #[test]
+    fn test_project_managed_store_included_in_scan() {
+        // AC 2: Project-managed store at <project_root>/.sikil/skills/ is
+        // included in the scan when inside a project root.
+        let temp_base = TempDir::new().unwrap();
+        let project_root = temp_base.path();
+
+        // Create project marker
+        let sikil_dir = project_root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "schema_version = 1\n").unwrap();
+
+        // Create skill in project-managed store
+        let project_skills = project_root.join(".sikil").join("skills");
+        let skill_dir = project_skills.join("managed-skill");
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: managed-skill
+description: A project-managed skill
+---"#,
+        )
+        .unwrap();
+
+        // Create empty repo
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
+        let config = Config::new();
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(project_root)
+            .with_repo_root(&repo_dir);
+        let result = scanner.scan_all_agents();
+
+        assert_eq!(result.skill_count(), 1);
+        assert!(result.skills.contains_key("managed-skill"));
+        let skill = &result.skills["managed-skill"];
+        assert!(skill.is_managed);
+        assert_eq!(skill.repo_path, Some(project_skills.join("managed-skill")));
+    }
+
+    #[test]
+    fn test_symlinks_to_project_skills_classified_as_managed() {
+        // AC 3: Symlinks pointing into <project_root>/.sikil/skills/ are
+        // classified as managed (project-managed).
+        let temp_base = TempDir::new().unwrap();
+        let project_root = temp_base.path();
+
+        // Create project marker
+        let sikil_dir = project_root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "schema_version = 1\n").unwrap();
+
+        // Create skill in project-managed store
+        let project_skills = project_root.join(".sikil").join("skills");
+        let skill_dir = project_skills.join("proj-skill");
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: proj-skill
+description: A project-managed skill
+---"#,
+        )
+        .unwrap();
+
+        // Create agent workspace with symlink pointing to project skills store
+        let ws_skills = project_root.join(".claude").join("skills");
+        fs::create_dir_all(&ws_skills).unwrap();
+        std::os::unix::fs::symlink(&skill_dir, ws_skills.join("proj-skill")).unwrap();
+
+        // Create empty repo
+        let repo_dir = temp_base.path().join("repo");
+        fs::create_dir(&repo_dir).unwrap();
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                PathBuf::from("/nonexistent/global"),
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(project_root)
+            .with_repo_root(&repo_dir);
+        let result = scanner.scan_all_agents();
+
+        assert_eq!(result.skill_count(), 1);
+        let skill = &result.skills["proj-skill"];
+        assert!(skill.is_managed);
+        // The workspace symlink installation is preserved
+        assert!(skill
+            .installations
+            .iter()
+            .any(|i| i.is_symlink == Some(true)));
+    }
+
+    #[test]
+    fn test_skill_in_both_project_and_global_merged() {
+        // AC 4: A skill present in both the project-managed store and the
+        // global repo appears as a single skill with installations from both scopes.
+        let temp_base = TempDir::new().unwrap();
+        let project_root = temp_base.path();
+
+        // Create project marker
+        let sikil_dir = project_root.join(".sikil");
+        fs::create_dir_all(&sikil_dir).unwrap();
+        fs::write(sikil_dir.join("manifest.toml"), "schema_version = 1\n").unwrap();
+
+        // Create skill in project-managed store
+        let project_skills = project_root.join(".sikil").join("skills");
+        let proj_skill = project_skills.join("shared-skill");
+        fs::create_dir_all(&proj_skill).unwrap();
+        fs::write(
+            proj_skill.join("SKILL.md"),
+            r#"---
+name: shared-skill
+description: A shared skill
+---"#,
+        )
+        .unwrap();
+
+        // Create same skill in global repo
+        let repo_dir = temp_base.path().join("repo");
+        let global_skill = repo_dir.join("shared-skill");
+        fs::create_dir_all(&global_skill).unwrap();
+        fs::write(
+            global_skill.join("SKILL.md"),
+            r#"---
+name: shared-skill
+description: A shared skill
+---"#,
+        )
+        .unwrap();
+
+        // Agent workspace symlink → project skills store (Workspace scope)
+        let ws_skills = project_root.join(".claude").join("skills");
+        fs::create_dir_all(&ws_skills).unwrap();
+        std::os::unix::fs::symlink(&proj_skill, ws_skills.join("shared-skill")).unwrap();
+
+        // Agent global symlink → global repo (Global scope)
+        let global_agent_dir = temp_base.path().join("agent-global").join("skills");
+        fs::create_dir_all(&global_agent_dir).unwrap();
+        std::os::unix::fs::symlink(&global_skill, global_agent_dir.join("shared-skill")).unwrap();
+
+        let mut config = Config::new();
+        config.insert_agent(
+            "claude-code".to_string(),
+            crate::core::config::AgentConfig::new(
+                true,
+                global_agent_dir,
+                PathBuf::from(".claude/skills"),
+            ),
+        );
+
+        let scanner = Scanner::without_cache(config)
+            .with_workspace_root(project_root)
+            .with_repo_root(&repo_dir);
+        let result = scanner.scan_all_agents();
+
+        // One merged skill, not two separate entries
+        assert_eq!(result.skill_count(), 1);
+        let skill = &result.skills["shared-skill"];
+        assert!(skill.is_managed);
+        // Installations from both scopes (Global + Workspace)
+        assert!(
+            skill.installations.len() >= 2,
+            "expected >= 2 installations, got {}",
+            skill.installations.len()
+        );
+        let scopes: Vec<_> = skill.installations.iter().map(|i| i.scope).collect();
+        assert!(scopes.contains(&Scope::Global), "missing Global scope");
+        assert!(
+            scopes.contains(&Scope::Workspace),
+            "missing Workspace scope"
+        );
     }
 
     #[test]
